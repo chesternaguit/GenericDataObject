@@ -88,5 +88,21 @@ namespace GenericDataObject
             return value;
         }
 
+        public static IEnumerable<TSource> DistinctBy<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector)
+        {
+            HashSet<TKey> seenKeys = new HashSet<TKey>();   
+            foreach(TSource element in source)
+            {
+                if(seenKeys.Add(keySelector(element)))
+                {
+                    yeild return element;
+                }
+            }
+        }
+        
+        public static bool WithinDateRange(this DateTime value, DateTime startRange, DateTime endRange)
+        {
+            return (startRange <= value && value <= endRange);
+        }
     }
 }
