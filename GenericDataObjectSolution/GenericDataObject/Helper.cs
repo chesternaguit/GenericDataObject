@@ -104,5 +104,18 @@ namespace GenericDataObject
         {
             return (startRange <= value && value <= endRange);
         }
+        
+        /// <summary>
+        /// Maps the type of every item of the list into type TOutput
+        /// </summary>
+        /// <param name="mapperFunction">function that specifies how the properties of type TSource will be mapped to type TOutput</param>
+        /// <returns>returns IEnumerable of type Output</returns>
+        public static IEnumerable<TOutput> Map(this IEnumerable<TSource> source, Func<TSource, TOutput> mapperFunction)
+        {
+            foreach(TSource element in source)
+            {
+                yeild return mapperFunction(element);
+            }
+        }
     }
 }
