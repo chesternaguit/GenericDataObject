@@ -4,17 +4,18 @@ A helper class that utilizes System.Reflection class to support any reference ty
 This aims to help developers create n-tier systems faster.<br/>
 Project includes starting classes for SharePoint and SQL.<br/>
 
+<h4>USE IT AS A HELPER</h4>
 <pre>
-//Use it as a helper:
-
 public class Person //your model
 {
-  //the generic data object will assume that the property names here also exist in your SharePoint List
+  //the generic data object will assume that 
+  //the property names here also exist in your SharePoint List
   public int ID { get; set; }
   public string Title { get; set; }
   public string FirstName { get; set; }
   public string LastName { get; set; }
-  //make sure that the properties declared here matches the Internal Names in your SharePoint List
+  //also make sure that the properties declared here 
+  //matches the Internal Names in your SharePoint List
   public string Nick_x0020_Name { get; set; }
 }
 
@@ -43,11 +44,11 @@ public class PersonRepository
     return gSPDataObject&lt;Person&gt;.Delete(new Person() { ID = id });
   }
 }
+</pre>
 
 
-
-//Or Inherit it as a base class for your data layer object:
-
+<h4>OR INHERIT IT AS A BASE CLASS FOR YOUR DATA LAYER OBJECT</h4>
+<pre>
 public class DO_Person : gSPDataObject&lt;Person&gt;
 { }
 
@@ -77,3 +78,9 @@ public class BO_Person
   }
 }
 </pre>
+<br/>
+<h3>TODO</h3>
+<ul>
+<li>Write Custom Attributes to support custom property name of the Model</li>
+<li>Add Function Delegate as parameter on Read Methods to support custom mapping of properties</li>
+</ul>
