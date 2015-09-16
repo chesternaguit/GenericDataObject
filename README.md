@@ -4,7 +4,7 @@ A helper class that utilizes System.Reflection class to support any reference ty
 This aims to help developers create n-tier systems faster.<br/>
 Project includes starting classes for SharePoint and SQL.<br/>
 
-<pre><code>
+<pre>
 //Use it as a helper:
 
 public class Person //your model
@@ -22,25 +22,25 @@ public class PersonRepository
 {
   public PersonRepository()
   {//set your connection variables and pass the Type of the Model as parameter for the Generic Data Object class
-    gSPDataObject<Person>.ConnectionString = "YourConnectionStringHere"
-    gSPDataObject<Person>.spList = "YourSharePointListNameHere";
-    gSPDataObject<Person>.refreshInterval = 5; //optional cache interval in minutes
+    gSPDataObject&lt;Person&gt;.ConnectionString = "YourConnectionStringHere"
+    gSPDataObject&lt;Person&gt;.spList = "YourSharePointListNameHere";
+    gSPDataObject&lt;Person&gt;.refreshInterval = 5; //optional cache interval in minutes
   }
   public bool Create(Person person)
   {
-    return gSPDataObject<Person>.Create(person);
+    return gSPDataObject&lt;Person&gt;.Create(person);
   }
-  public List<Person> GetPersons()
+  public List&lt;Person&gt; GetPersons()
   {
-    return gSPDataObject<person>.GetAll();
+    return gSPDataObject&lt;person&gt;.GetAll();
   }
   public bool Update(Person person)
   {
-    return gSPDataObject<Person>.Update(person);
+    return gSPDataObject&lt;Person&gt;.Update(person);
   }
   public bool Delete(int id)
   {
-    return gSPDataObject<Person>.Delete(new Person() { ID = id });
+    return gSPDataObject&lt;Person&gt;.Delete(new Person() { ID = id });
   }
 }
 
@@ -48,7 +48,7 @@ public class PersonRepository
 
 //Or Inherit it as a base class for your data layer object:
 
-public class DO_Person : gSPDataObject<Person>
+public class DO_Person : gSPDataObject&lt;Person&gt;
 { }
 
 public class BO_Person
@@ -63,7 +63,7 @@ public class BO_Person
   {
     return DO_Person.Create(person);
   }
-  public List<Person> GetPersons()
+  public List&lt;Person&gt; GetPersons()
   {
     return DO_Person.GetAll();
   }
@@ -76,4 +76,4 @@ public class BO_Person
     return DO_Person.Delete(new Person() { ID = id });
   }
 }
-</code></pre>
+</pre>
