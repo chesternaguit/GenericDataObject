@@ -117,5 +117,13 @@ namespace GenericDataObject
                 yeild return mapperFunction(element);
             }
         }
+        
+        public static IEnumerable<TSource> FindEach<TSource, TValues>(this IEnumerable<TSource> source, IEnumerable<TValues> values, Func<TSource, TValues, bool> predicate)
+        {
+            foreach(TValues value in values)
+            {
+                yield return source.Where(item => predicate.Invoke(item, value)).First();
+            }
+        }
     }
 }
