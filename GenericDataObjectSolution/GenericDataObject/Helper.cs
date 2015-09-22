@@ -122,7 +122,13 @@ namespace GenericDataObject
         {
             foreach(TValues value in values)
             {
-                yield return source.Where(item => predicate.Invoke(item, value)).First();
+                foreach(TSource item in source)
+                {
+                    if(predicate.invoke(item, value))
+                    {
+                        yield return item;
+                    }
+                }
             }
         }
     }
