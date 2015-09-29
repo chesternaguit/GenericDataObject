@@ -14,9 +14,11 @@ public class Person //your model
   public string Title { get; set; }
   public string FirstName { get; set; }
   public string LastName { get; set; }
+  
   //also make sure that the properties declared here 
   //matches the Internal Names in your SharePoint List
   public string Nick_x0020_Name { get; set; }
+  
   //otherwise you may use the helper class FieldNameAttribute
   //to specify SharePoint List's Internal Name
   [FieldName("Primary_x0020_Address")]
@@ -88,4 +90,5 @@ public class BO_Person
 <h3>TODO</h3>
 <ul>
 <li>Add Function Delegate as parameter on Read Methods to support custom mapping of properties</li>
+<li>Enhance property type conversion handling</li>
 </ul>
