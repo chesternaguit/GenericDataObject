@@ -131,5 +131,31 @@ namespace GenericDataObject
                 }
             }
         }
+
+        public static void Each(this PropertyInfo[] propertyInfos, Action<PropertyInfo> propertyAction)
+        {
+            foreach (PropertyInfo prop in propertyInfos)
+            {
+                propertyAction(prop);
+            }
+        }
+
+        public static string GetFieldNameOrDefault(this PropertyInfo propertyInfo)
+        {
+            FieldNameAttribute fieldNameAttribute = (FieldNameAttribute)propertyInfo.GetCustomAttributes(typeof(FieldNameAttribute), false).FirstOrDefault();
+            string fieldName = propertyInfo.Name;
+            if (fieldNameAttribute != null) fieldName = fieldNameAttribute.fieldName ?? fieldName;
+            return fieldName;
+        }
+    }
+    
+    [AttributeUsage(AttributeTargets.Property)]
+    public class FieldNameAttribute : Attribute
+    {
+        public string fieldName { get; set; }
+        public FieldNameAttribute(string fieldName)
+        {
+            this.fieldName = fieldName;
+        }
     }
 }
