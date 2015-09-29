@@ -17,12 +17,18 @@ public class Person //your model
   //also make sure that the properties declared here 
   //matches the Internal Names in your SharePoint List
   public string Nick_x0020_Name { get; set; }
+  //otherwise you may use the helper class FieldNameAttribute
+  //to specify SharePoint List's Internal Name
+  [FieldName("Primary_x0020_Address")]
+  public string PrimaryAddress { get; set; }
 }
 
 public class PersonRepository
 {
   public PersonRepository()
-  {//set your connection variables and pass the Type of the Model as parameter for the Generic Data Object class
+  {
+    //set your connection variables and pass 
+    //the Type of the Model as parameter for the Generic Data Object class
     gSPDataObject&lt;Person&gt;.ConnectionString = "YourConnectionStringHere"
     gSPDataObject&lt;Person&gt;.spList = "YourSharePointListNameHere";
     gSPDataObject&lt;Person&gt;.refreshInterval = 5; //optional cache interval in minutes
@@ -81,6 +87,5 @@ public class BO_Person
 <br/>
 <h3>TODO</h3>
 <ul>
-<li>Write Custom Attributes to support custom property name of the Model</li>
 <li>Add Function Delegate as parameter on Read Methods to support custom mapping of properties</li>
 </ul>
