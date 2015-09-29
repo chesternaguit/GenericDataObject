@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -67,16 +67,17 @@ namespace GenericDataObject
                             string fields = "(";
                             string values = "Values(";
                             int initCtr = 0;
-                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                            objParams.Each(objParam =>
                             {
                                 if (objParam.Name != "ID")
                                 {
+                                    string fieldName = objParam.GetFieldNameOrDefault();
                                     string separator = initCtr == 0 ? string.Empty : ",";
-                                    fields += separator + "[" + objParam.Name + "]";
-                                    values += separator + "@" + objParam.Name;
+                                    fields += separator + "[" + fieldName + "]";
+                                    values += separator + "@" + fieldName;
                                     initCtr = 1;
                                 }
-                            }
+                            });
                             fields += ") ";
                             values += ")";
                             query += fields + values;
@@ -91,13 +92,14 @@ namespace GenericDataObject
                         xCom.CommandType = commandType;
                         #region xCom.Parameters.AddWithValue("@Name",Value) ...
 
-                        foreach (System.Reflection.PropertyInfo objParam in objParams)
+                        objParams.Each(objParam =>
                         {
                             if (objParam.Name != "ID")
                             {
-                                xCom.Parameters.AddWithValue("@" + objParam.Name, objParam.GetValue(newItem, null));
+                                string fieldName = objParam.GetFieldNameOrDefault();
+                                xCom.Parameters.AddWithValue("@" + fieldName, objParam.GetValue(newItem, null));
                             }
-                        }
+                        });
 
                         #endregion
                         try
@@ -258,33 +260,35 @@ namespace GenericDataObject
                                 while (xReader.Read())
                                 {
                                     TBusinessObject tmpItem = new TBusinessObject();
-                                    foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                    objParams.Each(objParam =>
                                     {
-                                        Object value = null;
+                                        string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        #region value = Convert.ToType(xReader[objParam.Name]);
+                                        #region value = Convert.ToType(xReader[fieldName]);
 
                                         if (objParam.PropertyType == typeof(int))
                                         {
-                                            value = Convert.ToInt32(xReader[objParam.Name]);
+                                            int value = Convert.ToInt32(xReader[fieldName]);
+                                            objParam.SetValue(tmpItem, value, null);
                                         }
                                         else if (objParam.PropertyType == typeof(decimal))
                                         {
-                                            value = Convert.ToDecimal(xReader[objParam.Name]);
+                                            decimal value = Convert.ToDecimal(xReader[fieldName]);
+                                            objParam.SetValue(tmpItem, value, null);
                                         }
                                         else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
                                         {
-                                            value = Enum.Parse(objParam.PropertyType, xReader[objParam.Name].ToString());
+                                            var value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
+                                            objParam.SetValue(tmpItem, value, null);
                                         }
                                         else
                                         {
-                                            value = xReader[objParam.Name];
+                                            objParam.SetValue(tmpItem, xReader[fieldName], null);
                                         }
 
                                         #endregion
 
-                                        objParam.SetValue(tmpItem, value, null);
-                                    }
+                                    });
                                     allItems.Add(tmpItem);
                                 }
                                 xReader.Close();
@@ -358,13 +362,14 @@ namespace GenericDataObject
                             string setValues = string.Empty;
                             string condition = string.Empty;
                             int initCtr = 0;
-                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                            objParams.Each(objParam =>
                             {
                                 if (objParam.Name != "ID")
                                 {
+                                    string fieldName = objParam.GetFieldNameOrDefault();
                                     string separator = initCtr == 0 ? string.Empty : ",";
 
-                                    setValues += separator + string.Format("[{0}] = @{0}", objParam.Name);
+                                    setValues += separator + string.Format("[{0}] = @{0}", fieldName);
 
                                     initCtr++;
                                 }
@@ -372,7 +377,7 @@ namespace GenericDataObject
                                 {
                                     condition = " Where ID=" + objParam.GetValue(itemToUpdate, null);
                                 }
-                            }
+                            });
                             query = query + setValues + condition;
                         }
                         else
@@ -394,10 +399,10 @@ namespace GenericDataObject
                         }
                         else
                         {
-                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                            objParams.Each(objParam =>
                             {
-                                xCom.Parameters.AddWithValue("@" + objParam.Name, objParam.GetValue(itemToUpdate, null));
-                            }
+                                xCom.Parameters.AddWithValue("@" + objParam.GetFieldNameOrDefault(), objParam.GetValue(itemToUpdate, null));
+                            });
                         }
 
                         #endregion
