@@ -513,6 +513,11 @@ namespace GenericDataObject
 
         private static bool hasSpList()
         {
+            SPListNameAttribute listNameAttribute = (SPListNameAttribute)typeof(TModel).GetCustomAttributes(typeof(SPListNameAttribute), false).FirstOrDefault();
+            if (listNameAttribute != null)
+            {
+                spList = listNameAttribute.useClassName ? typeof(TModel).Name : (listNameAttribute.listName ?? spList); 
+            }
             if (string.IsNullOrEmpty(spList))
             {
                 throw new Exception("Operation Aborted, Data Object spList has not yet been configured. Please make sure the spList has been set Before calling any operation.");
