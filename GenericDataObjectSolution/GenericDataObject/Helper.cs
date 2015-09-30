@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,6 +6,7 @@ using Microsoft.SharePoint;
 using System.Configuration;
 using System.IO;
 using System.Reflection;
+using System.Collections;
 
 namespace GenericDataObject
 {
@@ -31,6 +32,42 @@ namespace GenericDataObject
                 }
             }
             return null;
+        }
+
+        public static SPGroup GetSPGroup(SPListItem item, string key)
+        {
+            SPFieldUser field = item.Fields.GetField(key) as SPFieldUser;
+            if (field != null)
+            {
+                SPFieldUserValue fieldValue = field.GetFieldValue(item[key].ToString()) as SPFieldUserValue;
+                if (fieldValue != null)
+                {
+                    return SPContext.Current.Web.Groups[fieldValue.LookupValue];
+                }
+            }
+            return null;
+        }
+
+        public static string GetSPUserName(string fieldValue, string urlSite)
+        {
+            return GetSPUserName(fieldValue, new SPSite(urlSite));
+        }
+
+        private static string GetSPUserName(string fieldValue, SPSite site)
+        {
+            string userName = fieldValue;
+            if (!string.IsNullOrEmpty(fieldValue) && fieldValue.Contains(";#"))
+            {
+                using (SPSite _site = site)
+                {
+                    using (SPWeb _web = _site.OpenWeb())
+                    {
+                        SPFieldUserValue fuv = new SPFieldUserValue(_web, fieldValue);
+                        userName = fuv.User.Name;
+                    }
+                }
+            }
+            return userName;
         }
 
         public static byte[] ImageToByteArray(System.Drawing.Image imageIn)
@@ -90,44 +127,12 @@ namespace GenericDataObject
 
         public static IEnumerable<TSource> DistinctBy<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector)
         {
-            HashSet<TKey> seenKeys = new HashSet<TKey>();   
-            foreach(TSource element in source)
+            HashSet<TKey> seenKeys = new HashSet<TKey>();
+            foreach (TSource element in source)
             {
-                if(seenKeys.Add(keySelector(element)))
+                if (seenKeys.Add(keySelector(element)))
                 {
-                    yeild return element;
-                }
-            }
-        }
-        
-        public static bool WithinDateRange(this DateTime value, DateTime startRange, DateTime endRange)
-        {
-            return (startRange <= value && value <= endRange);
-        }
-        
-        /// <summary>
-        /// Maps the type of every item of the list into type TOutput
-        /// </summary>
-        /// <param name="mapperFunction">function that specifies how the properties of type TSource will be mapped to type TOutput</param>
-        /// <returns>returns IEnumerable of type Output</returns>
-        public static IEnumerable<TOutput> Map(this IEnumerable<TSource> source, Func<TSource, TOutput> mapperFunction)
-        {
-            foreach(TSource element in source)
-            {
-                yeild return mapperFunction(element);
-            }
-        }
-        
-        public static IEnumerable<TSource> FindEach<TSource, TValues>(this IEnumerable<TSource> source, IEnumerable<TValues> values, Func<TSource, TValues, bool> predicate)
-        {
-            foreach(TValues value in values)
-            {
-                foreach(TSource item in source)
-                {
-                    if(predicate.invoke(item, value))
-                    {
-                        yield return item;
-                    }
+                    yield return element;
                 }
             }
         }
@@ -147,35 +152,46 @@ namespace GenericDataObject
             if (fieldNameAttribute != null) fieldName = fieldNameAttribute.fieldName ?? fieldName;
             return fieldName;
         }
+
     }
-    
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class FieldNameAttribute : Attribute
     {
         public string fieldName { get; set; }
+        public FieldNameAttribute() { }
         public FieldNameAttribute(string fieldName)
         {
             this.fieldName = fieldName;
         }
     }
-    
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
     public class SPListNameAttribute : Attribute
     {
         public string listName { get; set; }
+        public bool useClassName { get; set; }
+        public SPListNameAttribute() { }
         public SPListNameAttribute(string listName)
         {
             this.listName = listName;
         }
+        public SPListNameAttribute(bool useClassName)
+        {
+            this.useClassName = useClassName;
+        }
     }
-    
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
     public class SQLTableNameAttribute : Attribute
     {
         public string tableName { get; set; }
+        public bool useClassName { get; set; }
+        public SQLTableNameAttribute() { }
         public SQLTableNameAttribute(string tableName)
         {
             this.tableName = tableName;
+        }
+        public SQLTableNameAttribute(bool useClassName)
+        {
+            this.useClassName = useClassName;
         }
     }
 }
