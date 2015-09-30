@@ -149,13 +149,33 @@ namespace GenericDataObject
         }
     }
     
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class FieldNameAttribute : Attribute
     {
         public string fieldName { get; set; }
         public FieldNameAttribute(string fieldName)
         {
             this.fieldName = fieldName;
+        }
+    }
+    
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+    public class SPListNameAttribute : Attribute
+    {
+        public string listName { get; set; }
+        public SPListNameAttribute(string listName)
+        {
+            this.listName = listName;
+        }
+    }
+    
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+    public class SQLTableNameAttribute : Attribute
+    {
+        public string tableName { get; set; }
+        public SQLTableNameAttribute(string tableName)
+        {
+            this.tableName = tableName;
         }
     }
 }
