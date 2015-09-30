@@ -33,6 +33,7 @@ public class PersonRepository
     //the Type of the Model as parameter for the Generic Data Object class
     gSPDataObject&lt;Person&gt;.ConnectionString = "YourConnectionStringHere"
     gSPDataObject&lt;Person&gt;.spList = "YourSharePointListNameHere";
+    gSPDataObject&lt;Person&gt;.userToken = SPContext.Current.Web.CurrentUser.UserToken; //default is Site SysAccount
     gSPDataObject&lt;Person&gt;.refreshInterval = 5; //optional cache interval in minutes
   }
   public bool Create(Person person)
@@ -66,6 +67,7 @@ public class BO_Person
   {//set variables
     DO_Person.ConnectionString = "YourConnectionStringHere";
     DO_Person.spList = "YourSharePointListNameHere";
+    DO_Person.userToken = SPContext.Current.Web.CurrentUser.UserToken;
     DO_Person.refreshInterval = 5;
   }
   public bool Create(Person person)
