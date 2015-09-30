@@ -6,7 +6,7 @@ using System.Data.SqlClient;
 
 namespace GenericDataObject
 {
-    public class gSQLDataObject<TBusinessObject> where TBusinessObject : new()
+    public class gSQLDataObject<TModel> where TModel : new()
     {
 
         #region Properties
@@ -19,7 +19,7 @@ namespace GenericDataObject
         public static string updateQuery = string.Empty;
         public static string deleteQuery = string.Empty;
         //cache variables
-        private static List<TBusinessObject> cachedItems = null;
+        private static List<TModel> cachedItems = null;
         private static DateTime? timeRefresh = (DateTime?)null;
         public static int refreshInterval = 0;
 
@@ -27,30 +27,30 @@ namespace GenericDataObject
 
         #region Create
 
-        public static bool Create(TBusinessObject newItem)
+        public static bool Create(TModel newItem)
         {
             return Create(newItem, System.Data.CommandType.Text, string.Empty);
         }
 
-        public static bool Create(TBusinessObject newItem, System.Data.CommandType commandType, string commandText)
+        public static bool Create(TModel newItem, System.Data.CommandType commandType, string commandText)
         {
             object tmp = null;
             return Create(newItem, commandType, commandText, out tmp);
         }
 
-        public static bool Create(TBusinessObject newItem, out object identity)
+        public static bool Create(TModel newItem, out object identity)
         {
             identity = null;
             return Create(newItem, System.Data.CommandType.Text, string.Empty, out identity);
         }
 
-        public static bool Create(TBusinessObject newItem, System.Data.CommandType commandType, string commandText, out object identity)
+        public static bool Create(TModel newItem, System.Data.CommandType commandType, string commandText, out object identity)
         {
             bool xBool = false;
 
             try
             {
-                System.Reflection.PropertyInfo[] objParams = typeof(TBusinessObject).GetProperties();
+                System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
                 hasConnectionString();
                 hasSqlTable();
                 using (SqlConnection xCon = new SqlConnection(connectionString))
@@ -131,16 +131,16 @@ namespace GenericDataObject
 
         #region Read
 
-        public static TBusinessObject GetItemByID(int id)
+        public static TModel GetItemByID(int id)
         {
-            TBusinessObject theItem = new TBusinessObject();
+            TModel theItem = new TModel();
             try
             {
                 if (!isCached())
                 {
                     #region Try to get the item from the server
 
-                    var objParams = typeof(TBusinessObject).GetProperties();
+                    var objParams = typeof(TModel).GetProperties();
                     hasConnectionString();
                     hasSqlTable();
                     using (SqlConnection xCon = new SqlConnection(connectionString))
@@ -213,21 +213,21 @@ namespace GenericDataObject
             return theItem;
         }
 
-        public static List<TBusinessObject> GetAll()
+        public static List<TModel> GetAll()
         {
             return GetAll(System.Data.CommandType.Text, "", null);
         }
 
-        public static List<TBusinessObject> GetAll(Predicate<TBusinessObject> predicate)
+        public static List<TModel> GetAll(Predicate<TModel> predicate)
         {
             return (from x in GetAll(System.Data.CommandType.Text, "", null)
                     where predicate.Invoke(x)
                     select x).ToList();
         }
 
-        public static List<TBusinessObject> GetAll(System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public static List<TModel> GetAll(System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
         {
-            List<TBusinessObject> allItems = new List<TBusinessObject>();
+            List<TModel> allItems = new List<TModel>();
 
             try
             {
@@ -235,7 +235,7 @@ namespace GenericDataObject
                 {
                     #region Try to get the list of data from server
 
-                    System.Reflection.PropertyInfo[] objParams = typeof(TBusinessObject).GetProperties();
+                    System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
                     hasConnectionString();
                     hasSqlTable();
                     using (SqlConnection xCon = new SqlConnection(connectionString))
@@ -259,7 +259,7 @@ namespace GenericDataObject
                                 xReader = xCom.ExecuteReader();
                                 while (xReader.Read())
                                 {
-                                    TBusinessObject tmpItem = new TBusinessObject();
+                                    TModel tmpItem = new TModel();
                                     objParams.Each(objParam =>
                                     {
                                         string fieldName = objParam.GetFieldNameOrDefault();
@@ -320,24 +320,24 @@ namespace GenericDataObject
 
         #region Update
 
-        public static bool Update(TBusinessObject itemToUpdate)
+        public static bool Update(TModel itemToUpdate)
         {
             int tmp = 0;
             return Update(itemToUpdate, out tmp);
         }
 
-        public static bool Update(TBusinessObject itemToUpdate, out int rowsAffected)
+        public static bool Update(TModel itemToUpdate, out int rowsAffected)
         {
             return Update(itemToUpdate, System.Data.CommandType.Text, string.Empty, null, out rowsAffected);
         }
 
-        public static bool Update(TBusinessObject itemToUpdate, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public static bool Update(TModel itemToUpdate, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
         {
             int tmp = 0;
             return Update(itemToUpdate, commandType, commandText, commandParameters, out tmp);
         }
 
-        public static bool Update(TBusinessObject itemToUpdate, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters, out int rowsAffected)
+        public static bool Update(TModel itemToUpdate, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters, out int rowsAffected)
         {
             bool xBool = false;
             rowsAffected = 0;
@@ -435,24 +435,24 @@ namespace GenericDataObject
 
         #region Delete
 
-        public static bool Delete(TBusinessObject itemToDelete)
+        public static bool Delete(TModel itemToDelete)
         {
             int tmp = 0;
             return Delete(itemToDelete, out tmp);
         }
 
-        public static bool Delete(TBusinessObject itemToDelete, out int rowsAffected)
+        public static bool Delete(TModel itemToDelete, out int rowsAffected)
         {
             return Delete(itemToDelete, System.Data.CommandType.Text, string.Empty, null, out rowsAffected);
         }
 
-        public static bool Delete(TBusinessObject itemToDelete, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public static bool Delete(TModel itemToDelete, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
         {
             int tmp = 0;
             return Delete(itemToDelete, commandType, commandText, commandParameters, out tmp);
         }
 
-        public static bool Delete(TBusinessObject itemToDelete, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters, out int rowsAffected)
+        public static bool Delete(TModel itemToDelete, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters, out int rowsAffected)
         {
             bool xBool = false;
             rowsAffected = 0;
@@ -506,11 +506,11 @@ namespace GenericDataObject
 
         #region Private Methods
 
-        private static bool hasID(TBusinessObject item)
+        private static bool hasID(TModel item)
         {
             if (item.GetType().GetProperty("ID") == null)
             {
-                throw new Exception(string.Format("Operation Failed, The Object of Type ({0}) does not have a property named \"ID\" of Type Int32", typeof(TBusinessObject).Name));
+                throw new Exception(string.Format("Operation Failed, The Object of Type ({0}) does not have a property named \"ID\" of Type Int32", typeof(TModel).Name));
             }
             return true;
         }
@@ -545,7 +545,7 @@ namespace GenericDataObject
             }
         }
 
-        private static void CacheList(List<TBusinessObject> items)
+        private static void CacheList(List<TModel> items)
         {
             cachedItems = items;
             timeRefresh = DateTime.Now.AddMinutes(refreshInterval);
