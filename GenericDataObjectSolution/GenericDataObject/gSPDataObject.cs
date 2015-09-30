@@ -6,15 +6,16 @@ using Microsoft.SharePoint;
 
 namespace GenericDataObject
 {
-    public class gSPDataObject<TBusinessObject> where TBusinessObject : new()
+    public class gSPDataObject<TModel> where TModel : new()
     {
 
         #region Properties
 
-        public static string ConnectionString = string.Empty;
+        public static string ConnectionString = SPContext.Current.Site.Url;
         public static string spList = string.Empty;
+        public static SPUserToken userToken = SPContext.Current.Site.SystemAccount.UserToken;
         //caching variables
-        private static List<TBusinessObject> cachedItems = null;
+        private static List<TModel> cachedItems = null;
         private static DateTime? timeRefresh = (DateTime?)null;
         public static int refreshInterval = 0;
 
@@ -22,7 +23,7 @@ namespace GenericDataObject
 
         #region Create
 
-        public static bool Create(TBusinessObject newItem)
+        public static bool Create(TModel newItem)
         {
             bool xBool = false;
 
@@ -30,32 +31,29 @@ namespace GenericDataObject
             {
                 hasConnectionString();
                 hasSpList();
-                SPSecurity.RunWithElevatedPrivileges(delegate()
+                using (SPSite site = new SPSite(ConnectionString, userToken))
                 {
-                    using (SPSite site = new SPSite(ConnectionString))
+                    using (SPWeb web = site.OpenWeb())
                     {
-                        using (SPWeb web = site.OpenWeb())
+                        System.Reflection.PropertyInfo[] objParams = newItem.GetType().GetProperties();
+                        SPList list = web.Lists.TryGetList(spList);
+                        if (list == null)
                         {
-                            System.Reflection.PropertyInfo[] objParams = newItem.GetType().GetProperties();
-                            SPList list = web.Lists.TryGetList(spList);
-                            if (list == null)
-                            {
-                                throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
-                            }
-                            SPListItem item = list.AddItem();
-                            objParams.Each(objParam =>
-                            {
-                                if (objParam.Name != "ID")
-                                {
-                                    string fieldName = objParam.GetFieldNameOrDefault();
-                                    item[fieldName] = objParam.GetValue(newItem, null);
-                                }
-                            });
-                            item.Update();
-                            xBool = true;
+                            throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
                         }
+                        SPListItem item = list.AddItem();
+                        objParams.Each(objParam =>
+                        {
+                            if (objParam.Name != "ID")
+                            {
+                                string fieldName = objParam.GetFieldNameOrDefault();
+                                item[fieldName] = objParam.GetValue(newItem, null);
+                            }
+                        });
+                        item.Update();
+                        xBool = true;
                     }
-                });
+                }
             }
             catch (Exception ex)
             {
@@ -69,9 +67,9 @@ namespace GenericDataObject
 
         #region Read
 
-        public static TBusinessObject GetItemByID(int id)
+        public static TModel GetItemByID(int id)
         {
-            TBusinessObject theItem = new TBusinessObject();
+            TModel theItem = new TModel();
 
             try
             {
@@ -81,66 +79,63 @@ namespace GenericDataObject
 
                     hasConnectionString();
                     hasSpList();
-                    SPSecurity.RunWithElevatedPrivileges(delegate()
+                    using (SPSite site = new SPSite(ConnectionString, userToken))
                     {
-                        using (SPSite site = new SPSite(ConnectionString))
+                        using (SPWeb web = site.OpenWeb())
                         {
-                            using (SPWeb web = site.OpenWeb())
+                            System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
+                            SPList list = web.Lists.TryGetList(spList);
+                            if (list == null)
                             {
-                                System.Reflection.PropertyInfo[] objParams = typeof(TBusinessObject).GetProperties();
-                                SPList list = web.Lists.TryGetList(spList);
-                                if (list == null)
-                                {
-                                    throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
-                                }
-                                SPQuery query = new SPQuery();
-                                query.Query = @"<Where>
-                                            <Eq>
-                                                <FieldRef Name=""ID"" LookupId=""TRUE""/>
-                                                <Value Type=""Integer"">" + id + @"</value>
-                                            </Eq>
-                                        </Where>";
-                                query.ViewFields = string.Empty;
+                                throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
+                            }
+                            SPQuery query = new SPQuery();
+                            query.Query = @"<Where>
+                                        <Eq>
+                                            <FieldRef Name=""ID"" LookupId=""TRUE""/>
+                                            <Value Type=""Integer"">" + id + @"</value>
+                                        </Eq>
+                                    </Where>";
+                            query.ViewFields = string.Empty;
+                            objParams.Each(objParam =>
+                            {
+                                query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.Name);
+                            });
+                            SPListItemCollection items = list.GetItems(query);
+                            foreach (SPListItem item in items)
+                            {
                                 objParams.Each(objParam =>
                                 {
-                                    query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.Name);
-                                });
-                                SPListItemCollection items = list.GetItems(query);
-                                foreach (SPListItem item in items)
-                                {
-                                    objParams.Each(objParam =>
-                                    {
-                                        string fieldName = objParam.GetFieldNameOrDefault();
+                                    string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        if (objParam.PropertyType == typeof(int))
-                                        {
-                                            int value = Convert.ToInt32(item[fieldName]);
-                                            objParam.SetValue(theItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType == typeof(decimal))
-                                        {
-                                            decimal value = Convert.ToDecimal(item[fieldName]);
-                                            objParam.SetValue(theItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType == typeof(SPUser))
-                                        {
-                                            SPUser value = Helper.GetSPUser(item, fieldName);
-                                            objParam.SetValue(theItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                        {
-                                            var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                            objParam.SetValue(theItem, value, null);
-                                        }
-                                        else
-                                        {
-                                            objParam.SetValue(theItem, item[fieldName], null);
-                                        }
-                                    });
-                                }
+                                    if (objParam.PropertyType == typeof(int))
+                                    {
+                                        int value = Convert.ToInt32(item[fieldName]);
+                                        objParam.SetValue(theItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType == typeof(decimal))
+                                    {
+                                        decimal value = Convert.ToDecimal(item[fieldName]);
+                                        objParam.SetValue(theItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType == typeof(SPUser))
+                                    {
+                                        SPUser value = Helper.GetSPUser(item, fieldName);
+                                        objParam.SetValue(theItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                    {
+                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                        objParam.SetValue(theItem, value, null);
+                                    }
+                                    else
+                                    {
+                                        objParam.SetValue(theItem, item[fieldName], null);
+                                    }
+                                });
                             }
                         }
-                    });
+                    }
 
                     #endregion
                 }
@@ -157,9 +152,9 @@ namespace GenericDataObject
             return theItem;
         }
 
-        public static TBusinessObject GetItemByTitle(string title)
+        public static TModel GetItemByTitle(string title)
         {
-            TBusinessObject theItem = new TBusinessObject();
+            TModel theItem = new TModel();
 
             try
             {
@@ -169,66 +164,63 @@ namespace GenericDataObject
 
                     hasConnectionString();
                     hasSpList();
-                    SPSecurity.RunWithElevatedPrivileges(delegate()
+                    using (SPSite site = new SPSite(ConnectionString, userToken))
                     {
-                        using (SPSite site = new SPSite(ConnectionString))
+                        using (SPWeb web = site.OpenWeb())
                         {
-                            using (SPWeb web = site.OpenWeb())
+                            System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
+                            SPList list = web.Lists.TryGetList(spList);
+                            if (list == null)
                             {
-                                System.Reflection.PropertyInfo[] objParams = typeof(TBusinessObject).GetProperties();
-                                SPList list = web.Lists.TryGetList(spList);
-                                if (list == null)
-                                {
-                                    throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
-                                }
-                                SPQuery query = new SPQuery();
-                                query.Query = @"<Where>
-                                            <Eq>
-                                                <FieldRef Name=""Title"" LookupId=""TRUE""/>
-                                                <Value Type=""Text"">" + title + @"</value>
-                                            </Eq>
-                                        </Where>";
-                                query.ViewFields = string.Empty;
+                                throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
+                            }
+                            SPQuery query = new SPQuery();
+                            query.Query = @"<Where>
+                                        <Eq>
+                                            <FieldRef Name=""Title"" LookupId=""TRUE""/>
+                                            <Value Type=""Text"">" + title + @"</value>
+                                        </Eq>
+                                    </Where>";
+                            query.ViewFields = string.Empty;
+                            objParams.Each(objParam =>
+                            {
+                                query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
+                            });
+                            SPListItemCollection items = list.GetItems(query);
+                            foreach (SPListItem item in items)
+                            {
                                 objParams.Each(objParam =>
                                 {
-                                    query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
-                                });
-                                SPListItemCollection items = list.GetItems(query);
-                                foreach (SPListItem item in items)
-                                {
-                                    objParams.Each(objParam =>
-                                    {
-                                        string fieldName = objParam.GetFieldNameOrDefault();
+                                    string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        if (objParam.PropertyType == typeof(int))
-                                        {
-                                            int value = Convert.ToInt32(item[fieldName]);
-                                            objParam.SetValue(theItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType == typeof(decimal))
-                                        {
-                                            decimal value = Convert.ToDecimal(item[fieldName]);
-                                            objParam.SetValue(theItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType == typeof(SPUser))
-                                        {
-                                            SPUser value = Helper.GetSPUser(item, fieldName);
-                                            objParam.SetValue(theItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                        {
-                                            var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                            objParam.SetValue(theItem, value, null);
-                                        }
-                                        else
-                                        {
-                                            objParam.SetValue(theItem, item[fieldName], null);
-                                        }
-                                    });
-                                }
+                                    if (objParam.PropertyType == typeof(int))
+                                    {
+                                        int value = Convert.ToInt32(item[fieldName]);
+                                        objParam.SetValue(theItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType == typeof(decimal))
+                                    {
+                                        decimal value = Convert.ToDecimal(item[fieldName]);
+                                        objParam.SetValue(theItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType == typeof(SPUser))
+                                    {
+                                        SPUser value = Helper.GetSPUser(item, fieldName);
+                                        objParam.SetValue(theItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                    {
+                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                        objParam.SetValue(theItem, value, null);
+                                    }
+                                    else
+                                    {
+                                        objParam.SetValue(theItem, item[fieldName], null);
+                                    }
+                                });
                             }
                         }
-                    });
+                    }
 
                     #endregion
                 }
@@ -245,21 +237,21 @@ namespace GenericDataObject
             return theItem;
         }
 
-        public static List<TBusinessObject> GetAll()
+        public static List<TModel> GetAll()
         {
             return GetAll(query: null);
         }
 
-        public static List<TBusinessObject> GetAll(Predicate<TBusinessObject> predicate)
+        public static List<TModel> GetAll(Predicate<TModel> predicate)
         {
             return (from x in GetAll(query: null)
                     where predicate.Invoke(x)
                     select x).ToList();
         }
 
-        public static List<TBusinessObject> GetAll(SPQuery query)
+        public static List<TModel> GetAll(SPQuery query)
         {
-            List<TBusinessObject> allItems = new List<TBusinessObject>();
+            List<TModel> allItems = new List<TModel>();
 
             try
             {
@@ -269,84 +261,81 @@ namespace GenericDataObject
 
                     hasConnectionString();
                     hasSpList();
-                    SPSecurity.RunWithElevatedPrivileges(delegate()
+                    using (SPSite site = new SPSite(ConnectionString, userToken))
                     {
-                        using (SPSite site = new SPSite(ConnectionString))
+                        using (SPWeb web = site.OpenWeb())
                         {
-                            using (SPWeb web = site.OpenWeb())
+                            System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
+                            SPList list = web.Lists.TryGetList(spList);
+                            if (list == null)
                             {
-                                System.Reflection.PropertyInfo[] objParams = typeof(TBusinessObject).GetProperties();
-                                SPList list = web.Lists.TryGetList(spList);
-                                if (list == null)
-                                {
-                                    throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
-                                }
-                                SPQuery spQuery = new SPQuery();
-                                #region Set defaults if query parameter is null
+                                throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
+                            }
+                            SPQuery spQuery = new SPQuery();
+                            #region Set defaults if query parameter is null
 
-                                if (query == null)
+                            if (query == null)
+                            {
+                                spQuery.Query = @"<Where>
+                                        <Gt>
+                                            <FieldRef Name=""ID"" LookupId=""TRUE""/>
+                                            <Value Type=""Integer"">0</value>
+                                        </Gt>
+                                    </Where>";
+                                spQuery.ViewFields = string.Empty;
+                                objParams.Each(objParam =>
                                 {
-                                    spQuery.Query = @"<Where>
-                                            <Gt>
-                                                <FieldRef Name=""ID"" LookupId=""TRUE""/>
-                                                <Value Type=""Integer"">0</value>
-                                            </Gt>
-                                        </Where>";
-                                    spQuery.ViewFields = string.Empty;
-                                    objParams.Each(objParam =>
+                                    spQuery.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
+                                });
+                            }
+                            else
+                            {
+                                spQuery = query;
+                            } 
+
+                            #endregion
+                            SPListItemCollection items = list.GetItems(spQuery);
+                            foreach (SPListItem item in items)
+                            {
+                                TModel tmpItem = new TModel();
+
+                                objParams.Each(objParam =>
+                                {
+                                    string fieldName = objParam.GetFieldNameOrDefault();
+
+                                    #region TheType value = Convert.ToType(item[fieldName]); objParam.SetValue(tmpItem, value, null);
+
+                                    if (objParam.PropertyType == typeof(int))
                                     {
-                                        spQuery.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
-                                    });
-                                }
-                                else
-                                {
-                                    spQuery = query;
-                                } 
-
-                                #endregion
-                                SPListItemCollection items = list.GetItems(spQuery);
-                                foreach (SPListItem item in items)
-                                {
-                                    TBusinessObject tmpItem = new TBusinessObject();
-
-                                    objParams.Each(objParam =>
+                                        int value = Convert.ToInt32(item[fieldName]);
+                                        objParam.SetValue(tmpItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType == typeof(decimal))
                                     {
-                                        string fieldName = objParam.GetFieldNameOrDefault();
+                                        decimal value = Convert.ToDecimal(item[fieldName]);
+                                        objParam.SetValue(tmpItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType == typeof(SPUser))
+                                    {
+                                        SPUser value = Helper.GetSPUser(item, fieldName);
+                                        objParam.SetValue(tmpItem, value, null);
+                                    }
+                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                    {
+                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                        objParam.SetValue(tmpItem, value, null);
+                                    }
+                                    else
+                                    {
+                                        objParam.SetValue(tmpItem, item[fieldName], null);
+                                    }
 
-                                        #region TheType value = Convert.ToType(item[fieldName]); objParam.SetValue(tmpItem, value, null);
-
-                                        if (objParam.PropertyType == typeof(int))
-                                        {
-                                            int value = Convert.ToInt32(item[fieldName]);
-                                            objParam.SetValue(tmpItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType == typeof(decimal))
-                                        {
-                                            decimal value = Convert.ToDecimal(item[fieldName]);
-                                            objParam.SetValue(tmpItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType == typeof(SPUser))
-                                        {
-                                            SPUser value = Helper.GetSPUser(item, fieldName);
-                                            objParam.SetValue(tmpItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                        {
-                                            var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                            objParam.SetValue(tmpItem, value, null);
-                                        }
-                                        else
-                                        {
-                                            objParam.SetValue(tmpItem, item[fieldName], null);
-                                        }
-
-                                        #endregion
-                                    });
-                                    allItems.Add(tmpItem);
-                                }
+                                    #endregion
+                                });
+                                allItems.Add(tmpItem);
                             }
                         }
-                    });
+                    }
 
                     #endregion
                     CacheList(allItems);
@@ -364,7 +353,7 @@ namespace GenericDataObject
 
         #region Update
 
-        public static bool Update(TBusinessObject itemToUpdate)
+        public static bool Update(TModel itemToUpdate)
         {
             bool xBool = false;
 
@@ -373,32 +362,29 @@ namespace GenericDataObject
                 hasConnectionString();
                 hasSpList();
                 hasID(itemToUpdate);
-                SPSecurity.RunWithElevatedPrivileges(delegate()
+                using (SPSite site = new SPSite(ConnectionString, userToken))
                 {
-                    using (SPSite site = new SPSite(ConnectionString))
+                    using (SPWeb web = site.OpenWeb())
                     {
-                        using (SPWeb web = site.OpenWeb())
+                        System.Reflection.PropertyInfo[] objParams = itemToUpdate.GetType().GetProperties();
+                        SPList list = web.Lists.TryGetList(spList);
+                        if (list == null)
                         {
-                            System.Reflection.PropertyInfo[] objParams = itemToUpdate.GetType().GetProperties();
-                            SPList list = web.Lists.TryGetList(spList);
-                            if (list == null)
-                            {
-                                throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
-                            }
-                            SPListItem item = list.GetItemById(Convert.ToInt32(itemToUpdate.GetType().GetProperty("ID").GetValue(itemToUpdate, null)));
-                            objParams.Each(objParam =>
-                            {
-                                if (objParam.Name != "ID")
-                                {
-                                    string fieldName = objParam.GetFieldNameOrDefault();
-                                    item[fieldName] = objParam.GetValue(itemToUpdate, null);
-                                }
-                            });
-                            item.Update();
-                            xBool = true;
+                            throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
                         }
+                        SPListItem item = list.GetItemById(Convert.ToInt32(itemToUpdate.GetType().GetProperty("ID").GetValue(itemToUpdate, null)));
+                        objParams.Each(objParam =>
+                        {
+                            if (objParam.Name != "ID")
+                            {
+                                string fieldName = objParam.GetFieldNameOrDefault();
+                                item[fieldName] = objParam.GetValue(itemToUpdate, null);
+                            }
+                        });
+                        item.Update();
+                        xBool = true;
                     }
-                });
+                }
             }
             catch (Exception ex)
             {
@@ -412,7 +398,7 @@ namespace GenericDataObject
 
         #region Delete
 
-        public static bool Delete(TBusinessObject itemToDelete)
+        public static bool Delete(TModel itemToDelete)
         {
             bool xBool = false;
 
@@ -421,22 +407,19 @@ namespace GenericDataObject
                 hasConnectionString();
                 hasSpList();
                 hasID(itemToDelete);
-                SPSecurity.RunWithElevatedPrivileges(delegate()
+                using (SPSite site = new SPSite(ConnectionString, userToken))
                 {
-                    using (SPSite site = new SPSite(ConnectionString))
+                    using (SPWeb web = site.OpenWeb())
                     {
-                        using (SPWeb web = site.OpenWeb())
+                        SPList list = web.Lists.TryGetList(spList);
+                        if (list == null)
                         {
-                            SPList list = web.Lists.TryGetList(spList);
-                            if (list == null)
-                            {
-                                throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
-                            }
-                            list.Items.DeleteItemById(Convert.ToInt32(itemToDelete.GetType().GetProperty("ID").GetValue(itemToDelete, null)));
-                            xBool = true;
+                            throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
                         }
+                        list.Items.DeleteItemById(Convert.ToInt32(itemToDelete.GetType().GetProperty("ID").GetValue(itemToDelete, null)));
+                        xBool = true;
                     }
-                });
+                }
             }
             catch (Exception ex)
             {
@@ -450,11 +433,11 @@ namespace GenericDataObject
 
         #region Private Methods
 
-        private static bool hasID(TBusinessObject item)
+        private static bool hasID(TModel item)
         {
             if (item.GetType().GetProperty("ID") == null)
             {
-                throw new Exception(string.Format("Operation Failed, The Object of Type ({0}) does not have a property named \"ID\" of Type Int32", typeof(TBusinessObject).Name));
+                throw new Exception(string.Format("Operation Failed, The Object of Type ({0}) does not have a property named \"ID\" of Type Int32", typeof(TModel).Name));
             }
             return true;
         }
@@ -494,7 +477,7 @@ namespace GenericDataObject
             }
         }
 
-        private static void CacheList(List<TBusinessObject> items)
+        private static void CacheList(List<TModel> items)
         {
             cachedItems = items;
             timeRefresh = DateTime.Now.AddMinutes(refreshInterval);
