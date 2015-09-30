@@ -25,6 +25,11 @@ namespace GenericDataObject
 
         public static bool Create(TModel newItem)
         {
+            return Create(newItem, null);
+        }
+
+        public static bool Create(TModel newItem, Action<TModel, SPListItem> mapperDelegate)
+        {
             bool xBool = false;
 
             try
@@ -42,14 +47,21 @@ namespace GenericDataObject
                             throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
                         }
                         SPListItem item = list.AddItem();
-                        objParams.Each(objParam =>
+                        if (mapperDelegate == null)
                         {
-                            if (objParam.Name != "ID")
-                            {
-                                string fieldName = objParam.GetFieldNameOrDefault();
-                                item[fieldName] = objParam.GetValue(newItem, null);
-                            }
-                        });
+                            objParams.Each(objParam =>
+                                            {
+                                                if (objParam.Name != "ID")
+                                                {
+                                                    string fieldName = objParam.GetFieldNameOrDefault();
+                                                    item[fieldName] = objParam.GetValue(newItem, null);
+                                                }
+                                            }); 
+                        }
+                        else
+                        {
+                            mapperDelegate(newItem, item);
+                        }
                         item.Update();
                         xBool = true;
                     }
@@ -68,6 +80,11 @@ namespace GenericDataObject
         #region Read
 
         public static TModel GetItemByID(int id)
+        {
+            return GetItemByID(id, null);
+        }
+
+        public static TModel GetItemByID(int id, Func<SPListItem, TModel> mapperDelegate)
         {
             TModel theItem = new TModel();
 
@@ -104,35 +121,42 @@ namespace GenericDataObject
                             SPListItemCollection items = list.GetItems(query);
                             foreach (SPListItem item in items)
                             {
-                                objParams.Each(objParam =>
+                                if (mapperDelegate == null)
                                 {
-                                    string fieldName = objParam.GetFieldNameOrDefault();
+                                    objParams.Each(objParam =>
+                                                            {
+                                                                string fieldName = objParam.GetFieldNameOrDefault();
 
-                                    if (objParam.PropertyType == typeof(int))
-                                    {
-                                        int value = Convert.ToInt32(item[fieldName]);
-                                        objParam.SetValue(theItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType == typeof(decimal))
-                                    {
-                                        decimal value = Convert.ToDecimal(item[fieldName]);
-                                        objParam.SetValue(theItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType == typeof(SPUser))
-                                    {
-                                        SPUser value = Helper.GetSPUser(item, fieldName);
-                                        objParam.SetValue(theItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                    {
-                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                        objParam.SetValue(theItem, value, null);
-                                    }
-                                    else
-                                    {
-                                        objParam.SetValue(theItem, item[fieldName], null);
-                                    }
-                                });
+                                                                if (objParam.PropertyType == typeof(int))
+                                                                {
+                                                                    int value = Convert.ToInt32(item[fieldName]);
+                                                                    objParam.SetValue(theItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType == typeof(decimal))
+                                                                {
+                                                                    decimal value = Convert.ToDecimal(item[fieldName]);
+                                                                    objParam.SetValue(theItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType == typeof(SPUser))
+                                                                {
+                                                                    SPUser value = Helper.GetSPUser(item, fieldName);
+                                                                    objParam.SetValue(theItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                                                {
+                                                                    var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                                                    objParam.SetValue(theItem, value, null);
+                                                                }
+                                                                else
+                                                                {
+                                                                    objParam.SetValue(theItem, item[fieldName], null);
+                                                                }
+                                                            }); 
+                                }
+                                else
+                                {
+                                    theItem = mapperDelegate(item);
+                                }
                             }
                         }
                     }
@@ -153,6 +177,11 @@ namespace GenericDataObject
         }
 
         public static TModel GetItemByTitle(string title)
+        {
+            return GetItemByTitle(title, null);
+        }
+
+        public static TModel GetItemByTitle(string title, Func<SPListItem, TModel> mapperDelegate)
         {
             TModel theItem = new TModel();
 
@@ -189,35 +218,42 @@ namespace GenericDataObject
                             SPListItemCollection items = list.GetItems(query);
                             foreach (SPListItem item in items)
                             {
-                                objParams.Each(objParam =>
+                                if (mapperDelegate == null)
                                 {
-                                    string fieldName = objParam.GetFieldNameOrDefault();
+                                    objParams.Each(objParam =>
+                                                            {
+                                                                string fieldName = objParam.GetFieldNameOrDefault();
 
-                                    if (objParam.PropertyType == typeof(int))
-                                    {
-                                        int value = Convert.ToInt32(item[fieldName]);
-                                        objParam.SetValue(theItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType == typeof(decimal))
-                                    {
-                                        decimal value = Convert.ToDecimal(item[fieldName]);
-                                        objParam.SetValue(theItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType == typeof(SPUser))
-                                    {
-                                        SPUser value = Helper.GetSPUser(item, fieldName);
-                                        objParam.SetValue(theItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                    {
-                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                        objParam.SetValue(theItem, value, null);
-                                    }
-                                    else
-                                    {
-                                        objParam.SetValue(theItem, item[fieldName], null);
-                                    }
-                                });
+                                                                if (objParam.PropertyType == typeof(int))
+                                                                {
+                                                                    int value = Convert.ToInt32(item[fieldName]);
+                                                                    objParam.SetValue(theItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType == typeof(decimal))
+                                                                {
+                                                                    decimal value = Convert.ToDecimal(item[fieldName]);
+                                                                    objParam.SetValue(theItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType == typeof(SPUser))
+                                                                {
+                                                                    SPUser value = Helper.GetSPUser(item, fieldName);
+                                                                    objParam.SetValue(theItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                                                {
+                                                                    var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                                                    objParam.SetValue(theItem, value, null);
+                                                                }
+                                                                else
+                                                                {
+                                                                    objParam.SetValue(theItem, item[fieldName], null);
+                                                                }
+                                                            }); 
+                                }
+                                else
+                                {
+                                    theItem = mapperDelegate(item);
+                                }
                             }
                         }
                     }
@@ -250,6 +286,11 @@ namespace GenericDataObject
         }
 
         public static List<TModel> GetAll(SPQuery query)
+        {
+            return GetAll(query, null);
+        }
+
+        public static List<TModel> GetAll(SPQuery query, Func<SPListItem, TModel> mapperDelegate)
         {
             List<TModel> allItems = new List<TModel>();
 
@@ -299,39 +340,46 @@ namespace GenericDataObject
                             {
                                 TModel tmpItem = new TModel();
 
-                                objParams.Each(objParam =>
+                                if (mapperDelegate == null)
                                 {
-                                    string fieldName = objParam.GetFieldNameOrDefault();
+                                    objParams.Each(objParam =>
+                                                            {
+                                                                string fieldName = objParam.GetFieldNameOrDefault();
 
-                                    #region TheType value = Convert.ToType(item[fieldName]); objParam.SetValue(tmpItem, value, null);
+                                                                #region TheType value = Convert.ToType(item[fieldName]); objParam.SetValue(tmpItem, value, null);
 
-                                    if (objParam.PropertyType == typeof(int))
-                                    {
-                                        int value = Convert.ToInt32(item[fieldName]);
-                                        objParam.SetValue(tmpItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType == typeof(decimal))
-                                    {
-                                        decimal value = Convert.ToDecimal(item[fieldName]);
-                                        objParam.SetValue(tmpItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType == typeof(SPUser))
-                                    {
-                                        SPUser value = Helper.GetSPUser(item, fieldName);
-                                        objParam.SetValue(tmpItem, value, null);
-                                    }
-                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                    {
-                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                        objParam.SetValue(tmpItem, value, null);
-                                    }
-                                    else
-                                    {
-                                        objParam.SetValue(tmpItem, item[fieldName], null);
-                                    }
+                                                                if (objParam.PropertyType == typeof(int))
+                                                                {
+                                                                    int value = Convert.ToInt32(item[fieldName]);
+                                                                    objParam.SetValue(tmpItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType == typeof(decimal))
+                                                                {
+                                                                    decimal value = Convert.ToDecimal(item[fieldName]);
+                                                                    objParam.SetValue(tmpItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType == typeof(SPUser))
+                                                                {
+                                                                    SPUser value = Helper.GetSPUser(item, fieldName);
+                                                                    objParam.SetValue(tmpItem, value, null);
+                                                                }
+                                                                else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                                                {
+                                                                    var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                                                    objParam.SetValue(tmpItem, value, null);
+                                                                }
+                                                                else
+                                                                {
+                                                                    objParam.SetValue(tmpItem, item[fieldName], null);
+                                                                }
 
-                                    #endregion
-                                });
+                                                                #endregion
+                                                            });
+                                }
+                                else
+                                {
+                                    tmpItem = mapperDelegate(item);
+                                }
                                 allItems.Add(tmpItem);
                             }
                         }
@@ -355,6 +403,11 @@ namespace GenericDataObject
 
         public static bool Update(TModel itemToUpdate)
         {
+            return Update(itemToUpdate, null);
+        }
+
+        public static bool Update(TModel itemToUpdate, Action<TModel, SPListItem> mapperDelegate)
+        {
             bool xBool = false;
 
             try
@@ -373,14 +426,21 @@ namespace GenericDataObject
                             throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
                         }
                         SPListItem item = list.GetItemById(Convert.ToInt32(itemToUpdate.GetType().GetProperty("ID").GetValue(itemToUpdate, null)));
-                        objParams.Each(objParam =>
+                        if (mapperDelegate == null)
                         {
-                            if (objParam.Name != "ID")
-                            {
-                                string fieldName = objParam.GetFieldNameOrDefault();
-                                item[fieldName] = objParam.GetValue(itemToUpdate, null);
-                            }
-                        });
+                            objParams.Each(objParam =>
+                                            {
+                                                if (objParam.Name != "ID")
+                                                {
+                                                    string fieldName = objParam.GetFieldNameOrDefault();
+                                                    item[fieldName] = objParam.GetValue(itemToUpdate, null);
+                                                }
+                                            }); 
+                        }
+                        else
+                        {
+                            mapperDelegate(itemToUpdate, item);
+                        }
                         item.Update();
                         xBool = true;
                     }
