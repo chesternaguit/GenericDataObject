@@ -132,11 +132,11 @@ namespace GenericDataObject
             }
         }
 
-        public static void Each(this PropertyInfo[] propertyInfos, Action<PropertyInfo> propertyAction)
+        public static void Each<TSource>(this IEnumerable<TSource> items, Action<TSource> itemAction)
         {
-            foreach (PropertyInfo prop in propertyInfos)
+            foreach (TSource item in items)
             {
-                propertyAction(prop);
+                itemAction(item);
             }
         }
 
