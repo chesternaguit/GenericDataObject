@@ -526,6 +526,11 @@ namespace GenericDataObject
 
         private static bool hasSqlTable()
         {
+            SQLTableNameAttribute tableNameAttribute = (SQLTableNameAttribute)typeof(TModel).GetCustomAttributes(typeof(SQLTableNameAttribute), false).FirstOrDefault();
+            if (tableNameAttribute != null)
+            {
+                sqlTable = tableNameAttribute.useClassName ? typeof(TModel).Name : (tableNameAttribute.tableName ?? sqlTable); 
+            }
             if (string.IsNullOrEmpty(sqlTable))
             {
                 throw new Exception("Operation Aborted, Data Object sqlTable has not yet been configured. Please make sure the sqlTable has been set Before calling any operation.");
