@@ -78,7 +78,8 @@ The generic classes will be the one communicating with the database/sharepoint t
       public BO_Person()
       {//set variables
         DO_Person.ConnectionString = "YourConnectionStringHere";
-        //setting up splist here will not be required if list name is already specified on the model
+        //setting up splist here will not be required 
+        //if list name is already specified on the model
         DO_Person.spList = "YourSharePointListNameHere";
         DO_Person.userToken = SPContext.Current.Web.CurrentUser.UserToken;
         DO_Person.refreshInterval = 5;
