@@ -108,4 +108,5 @@ The generic classes will be the one communicating with the database/sharepoint t
 <h3>TODO</h3>
 <ul>
 <li>Enhance property type conversion handling</li>
+<li>Attributes for properties or fields to be skipped when retrieving data</li>
 </ul>
