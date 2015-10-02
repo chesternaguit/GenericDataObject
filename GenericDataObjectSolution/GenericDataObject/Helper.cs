@@ -124,7 +124,14 @@ namespace GenericDataObject
             }
             return value;
         }
-
+        /// <summary>
+        /// Returns a set of items that are unique by the specified key
+        /// </summary>
+        /// <typeparam name="TSource"></typeparam>
+        /// <typeparam name="TKey"></typeparam>
+        /// <param name="source"></param>
+        /// <param name="keySelector"></param>
+        /// <returns></returns>
         public static IEnumerable<TSource> DistinctBy<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector)
         {
             HashSet<TKey> seenKeys = new HashSet<TKey>();
@@ -136,15 +143,59 @@ namespace GenericDataObject
                 }
             }
         }
-
-        public static void Each<TSource>(this IEnumerable<TSource> items, Action<TSource> itemAction)
+        /// <summary>
+        /// Checks wether the Date is within the range of dates specified in the parameter
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="startRange"></param>
+        /// <param name="endRange"></param>
+        /// <returns>true if the value is within startRange and endRange</returns>
+        public static bool WithinDateRange(this DateTime value, DateTime startRange, DateTime endRange)
+        {
+            return (startRange <= value && value <= endRange);
+        }
+        /// <summary>
+        /// Finds each value within the source that satisfies the condition specified by the predicate
+        /// </summary>
+        /// <typeparam name="TSource">The data type of the source</typeparam>
+        /// <typeparam name="TValue">The data type of the values</typeparam>
+        /// <param name="source">IEnumerable where the values will be searched</param>
+        /// <param name="values">IEnumerable of values to be searched</param>
+        /// <param name="predicate">specifies the condition for the comparison</param>
+        /// <returns>Returns IEnumerable of items from source where predicate returns true</returns>
+        public static IEnumerable<TSource> FindEach<TSource, TValue>(this IEnumerable<TSource> source, IEnumerable<TValue> values, Func<TSource, TValue, bool> predicate)
+        {
+            foreach (TValue value in values)
+            {
+                foreach (TSource item in source)
+                {
+                    if (predicate.Invoke(item, value))
+                    {
+                        yield return item;
+                    }
+                }
+            }
+        }
+        /// <summary>
+        /// Performs specified action on iteration of each item
+        /// </summary>
+        /// <typeparam name="TSource">Type of the Enumerable item</typeparam>
+        /// <param name="items">Enumerable items where the action is to be performed</param>
+        /// <param name="itemAction">A Function that will be invoked for every iteration and takes the individual item as its parameter</param>
+        /// <returns>Returns the Enumerable items for chaining</returns>
+        public static IEnumerable<TSource> Each<TSource>(this IEnumerable<TSource> items, Action<TSource> itemAction)
         {
             foreach (TSource item in items)
             {
                 itemAction(item);
+                yield return item;
             }
         }
-
+        /// <summary>
+        /// Gets the Field name specified by FieldNameAttribute, if the attribute does not exist returns PropertyInfo.Name as default
+        /// </summary>
+        /// <param name="propertyInfo"></param>
+        /// <returns></returns>
         public static string GetFieldNameOrDefault(this PropertyInfo propertyInfo)
         {
             FieldNameAttribute fieldNameAttribute = (FieldNameAttribute)propertyInfo.GetCustomAttributes(typeof(FieldNameAttribute), false).FirstOrDefault();
@@ -154,6 +205,9 @@ namespace GenericDataObject
         }
 
     }
+    /// <summary>
+    /// a property or field attribute that specifies the internal name of the field that the target is associated
+    /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class FieldNameAttribute : Attribute
     {
@@ -164,6 +218,9 @@ namespace GenericDataObject
             this.fieldName = fieldName;
         }
     }
+    /// <summary>
+    /// a class attribute that specifies the name of the SharePoint List that the target is associated
+    /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
     public class SPListNameAttribute : Attribute
     {
@@ -179,6 +236,9 @@ namespace GenericDataObject
             this.useClassName = useClassName;
         }
     }
+    /// <summary>
+    /// a class attribute that specifies the name of the Database table that the target is associated
+    /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
     public class SQLTableNameAttribute : Attribute
     {
