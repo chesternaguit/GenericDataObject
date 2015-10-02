@@ -1,93 +1,108 @@
 # GenericDataObject
-generic data object for n-tier and repository pattern in .NET Framework<br/>
-A helper class that utilizes System.Reflection class to support any reference types.<br/>
-This aims to help developers create n-tier systems faster.<br/>
-Project includes starting classes for SharePoint and SQL.<br/>
+A Generic Helper Class for Multiple-Tier Architecture in .Net Framework<br/>
+
+<h4>OVERVIEW</h4>
+
+The Generic Classes of this project are intended to take care of the communication between your model in your .NET application and the source of your data on the server side which could either be a Database Table or a SharePoint List.So in other words, the generic classes will be serving as the Data Layer.<br/>
+The generic classes will be the one communicating with the database/sharepoint to fetch the data and will then pass that data to your models.
+
+<h4>SETTING UP YOUR MODEL</h4>
+
+    //you can now specify the SharePoint List name or the SQL Table name for the model
+    //using the custom attribute SPListName and SQLTableName
+    //as an alternative for setting the name via the constructor of the Business Object
+    //note: List name or Table name specified via Model Attribute will override values
+    //specified via constructor
+    [SPlistName(listName="Personalidad")]
+    [SQLTableName(tableName="tblPersons")]
+    public class Person
+    {
+      //the generic data object will assume that
+      //the property names here also exist in your SharePoint List
+      public int ID { get; set; }
+      public string Title { get; set; }
+      public string FirstName { get; set; }
+      public string LastName { get; set; }
+      
+      //also make sure that the properties declared here 
+      //matches the Internal Names in your SharePoint List
+      public string Nick_x0020_Name { get; set; }
+      
+      //otherwise you may use the helper class FieldNameAttribute
+      //to specify SharePoint List's Internal Name
+      [FieldName("Primary_x0020_Address")]
+      public string PrimaryAddress { get; set; }
+    }
+
+
 
 <h4>USE IT AS A HELPER</h4>
-<pre>
-public class Person //your model
-{
-  //the generic data object will assume that 
-  //the property names here also exist in your SharePoint List
-  public int ID { get; set; }
-  public string Title { get; set; }
-  public string FirstName { get; set; }
-  public string LastName { get; set; }
-  
-  //also make sure that the properties declared here 
-  //matches the Internal Names in your SharePoint List
-  public string Nick_x0020_Name { get; set; }
-  
-  //otherwise you may use the helper class FieldNameAttribute
-  //to specify SharePoint List's Internal Name
-  [FieldName("Primary_x0020_Address")]
-  public string PrimaryAddress { get; set; }
-}
 
-public class PersonRepository
-{
-  public PersonRepository()
-  {
-    //set your connection variables and pass 
-    //the Type of the Model as parameter for the Generic Data Object class
-    gSPDataObject&lt;Person&gt;.ConnectionString = "YourConnectionStringHere"
-    gSPDataObject&lt;Person&gt;.spList = "YourSharePointListNameHere";
-    gSPDataObject&lt;Person&gt;.userToken = SPContext.Current.Web.CurrentUser.UserToken; //default is Site SysAccount
-    gSPDataObject&lt;Person&gt;.refreshInterval = 5; //optional cache interval in minutes
-  }
-  public bool Create(Person person)
-  {
-    return gSPDataObject&lt;Person&gt;.Create(person);
-  }
-  public List&lt;Person&gt; GetPersons()
-  {
-    return gSPDataObject&lt;person&gt;.GetAll();
-  }
-  public bool Update(Person person)
-  {
-    return gSPDataObject&lt;Person&gt;.Update(person);
-  }
-  public bool Delete(int id)
-  {
-    return gSPDataObject&lt;Person&gt;.Delete(new Person() { ID = id });
-  }
-}
-</pre>
+    public class PersonRepository
+    {
+      public PersonRepository()
+      {
+        //set your connection variables and pass 
+        //the Type of the Model as parameter for the Generic Data Object class
+        gSPDataObject<Person>.ConnectionString = "YourConnectionStringHere"
+        gSPDataObject<Person>.spList = "YourSharePointListNameHere";
+        //if user token is not defined, it will default to Site SysAccount
+        gSPDataObject<Person>.userToken = SPContext.Current.Web.CurrentUser.UserToken; 
+        gSPDataObject<Person>.refreshInterval = 5; //optional cache interval in minutes
+      }
+      public bool Create(Person person)
+      {
+        return gSPDataObject<Person>.Create(person);
+      }
+      public List<Person> GetPersons()
+      {
+        return gSPDataObject<person>.GetAll();
+      }
+      public bool Update(Person person)
+      {
+        return gSPDataObject<Person>.Update(person);
+      }
+      public bool Delete(int id)
+      {
+        return gSPDataObject<Person>.Delete(new Person() { ID = id });
+      }
+    }
 
 
 <h4>OR INHERIT IT AS A BASE CLASS FOR YOUR DATA LAYER OBJECT</h4>
-<pre>
-public class DO_Person : gSPDataObject&lt;Person&gt;
-{ }
 
-public class BO_Person
-{
-  public BO_Person()
-  {//set variables
-    DO_Person.ConnectionString = "YourConnectionStringHere";
-    DO_Person.spList = "YourSharePointListNameHere";
-    DO_Person.userToken = SPContext.Current.Web.CurrentUser.UserToken;
-    DO_Person.refreshInterval = 5;
-  }
-  public bool Create(Person person)
-  {
-    return DO_Person.Create(person);
-  }
-  public List&lt;Person&gt; GetPersons()
-  {
-    return DO_Person.GetAll();
-  }
-  public bool Update(Person person)
-  {
-    return DO_Person.Update(person);
-  }
-  public bool Delete(int id)
-  {
-    return DO_Person.Delete(new Person() { ID = id });
-  }
-}
-</pre>
+    public class DO_Person : gSPDataObject<Person>
+    { }
+    public class BO_Person
+    {
+      public BO_Person()
+      {//set variables
+        DO_Person.ConnectionString = "YourConnectionStringHere";
+        //setting up splist here will not be required if list name is already specified on the model
+        DO_Person.spList = "YourSharePointListNameHere";
+        DO_Person.userToken = SPContext.Current.Web.CurrentUser.UserToken;
+        DO_Person.refreshInterval = 5;
+      }
+      public bool Create(Person person)
+      {
+        return DO_Person.Create(person);
+      }
+      public List<Person> GetPersons()
+      {
+        return DO_Person.GetAll();
+      }
+      public bool Update(Person person)
+      {
+        return DO_Person.Update(person);
+      }
+      public bool Delete(int id)
+      {
+        return DO_Person.Delete(new Person() { ID = id });
+      }
+    }
+
+<h4>..OR YOU MAY JUST USE IT HOWEVER YOU LIKE</h4>
+
 <br/>
 <h3>TODO</h3>
 <ul>
