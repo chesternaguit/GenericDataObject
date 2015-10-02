@@ -1,15 +1,22 @@
 # GenericDataObject
 A Generic Helper Class for Multiple-Tier Architecture in .Net Framework<br/>
 
+
 <h4>OVERVIEW</h4>
 
 The Generic Classes of this project are intended to take care of the communication between your model in your .NET application and the source of your data on the server side which could either be a Database Table or a SharePoint List.So in other words, the generic classes will be serving as the Data Layer.<br/>
 The generic classes will be the one communicating with the database/sharepoint to fetch the data and will then pass that data to your models.
 
+
+<h4>WHY?</h4>
+
+There might be instances that you will be working on an existing project where using Entity Framework is just not applicable and you plan on implementing Multi-Tier Architecture on that project, where sometimes, you separate the Presentation, Business Logic, and the Data Access Layer, and most often, some projects involved multiple models and you will have to write separate classes for accessing data for each model and you find it to be a repetitive and tedious task.
+
+
 <h4>SETTING UP YOUR MODEL</h4>
 
     //you can now specify the SharePoint List name or the SQL Table name for the model
-    //using the custom attribute SPListName and SQLTableName
+    //using the custom attribute "SPListName" and "SQLTableName"
     //as an alternative for setting the name via the constructor of the Business Object
     //note: List name or Table name specified via Model Attribute will override values
     //specified via constructor
@@ -28,12 +35,11 @@ The generic classes will be the one communicating with the database/sharepoint t
       //matches the Internal Names in your SharePoint List
       public string Nick_x0020_Name { get; set; }
       
-      //otherwise you may use the helper class FieldNameAttribute
+      //otherwise you may use the helper class "FieldNameAttribute"
       //to specify SharePoint List's Internal Name
       [FieldName("Primary_x0020_Address")]
       public string PrimaryAddress { get; set; }
     }
-
 
 
 <h4>USE IT AS A HELPER</h4>
@@ -102,9 +108,10 @@ The generic classes will be the one communicating with the database/sharepoint t
       }
     }
 
+
 <h4>..OR YOU MAY JUST USE IT HOWEVER YOU LIKE</h4>
 
-<br/>
+
 <h3>TODO</h3>
 <ul>
 <li>Enhance property type conversion handling</li>
