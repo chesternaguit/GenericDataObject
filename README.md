@@ -91,6 +91,5 @@ public class BO_Person
 <br/>
 <h3>TODO</h3>
 <ul>
-<li>Add Function Delegate as parameter on Read Methods to support custom mapping of properties</li>
 <li>Enhance property type conversion handling</li>
 </ul>
