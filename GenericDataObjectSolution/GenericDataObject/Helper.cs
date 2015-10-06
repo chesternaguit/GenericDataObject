@@ -182,13 +182,11 @@ namespace GenericDataObject
         /// <typeparam name="TSource">Type of the Enumerable item</typeparam>
         /// <param name="items">Enumerable items where the action is to be performed</param>
         /// <param name="itemAction">A Function that will be invoked for every iteration and takes the individual item as its parameter</param>
-        /// <returns>Returns the Enumerable items for chaining</returns>
-        public static IEnumerable<TSource> Each<TSource>(this IEnumerable<TSource> items, Action<TSource> itemAction)
+        public static void Each<TSource>(this IEnumerable<TSource> items, Action<TSource> itemAction)
         {
             foreach (TSource item in items)
             {
                 itemAction(item);
-                yield return item;
             }
         }
         /// <summary>
