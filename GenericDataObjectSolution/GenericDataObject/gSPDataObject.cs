@@ -51,14 +51,14 @@ namespace GenericDataObject
                                 SPListItem item = list.AddItem();
                                 if (mapperDelegate == null)
                                 {
-                                    foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                    objParams.Each(objParam =>
                                     {
                                         if (objParam.Name != "ID")
                                         {
                                             string fieldName = objParam.GetFieldNameOrDefault();
                                             item[fieldName] = objParam.GetValue(newItem, null);
                                         }
-                                    }
+                                    });
                                 }
                                 else
                                 {
@@ -127,16 +127,16 @@ namespace GenericDataObject
                                         </Eq>
                                     </Where>";
                                     query.ViewFields = string.Empty;
-                                    foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                    objParams.Each(objParam =>
                                     {
                                         query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.Name);
-                                    }
+                                    });
                                     SPListItemCollection items = list.GetItems(query);
                                     foreach (SPListItem item in items)
                                     {
                                         if (mapperDelegate == null)
                                         {
-                                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                            objParams.Each(objParam =>
                                             {
                                                 string fieldName = objParam.GetFieldNameOrDefault();
 
@@ -164,7 +164,7 @@ namespace GenericDataObject
                                                 {
                                                     objParam.SetValue(theItem, item[fieldName], null);
                                                 }
-                                            }
+                                            });
                                         }
                                         else
                                         {
@@ -234,16 +234,16 @@ namespace GenericDataObject
                                         </Eq>
                                     </Where>";
                                     query.ViewFields = string.Empty;
-                                    foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                    objParams.Each(objParam =>
                                     {
                                         query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
-                                    }
+                                    });
                                     SPListItemCollection items = list.GetItems(query);
                                     foreach (SPListItem item in items)
                                     {
                                         if (mapperDelegate == null)
                                         {
-                                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                            objParams.Each(objParam =>
                                             {
                                                 string fieldName = objParam.GetFieldNameOrDefault();
 
@@ -271,7 +271,7 @@ namespace GenericDataObject
                                                 {
                                                     objParam.SetValue(theItem, item[fieldName], null);
                                                 }
-                                            }
+                                            });
                                         }
                                         else
                                         {
@@ -358,10 +358,10 @@ namespace GenericDataObject
                                         </Gt>
                                     </Where>";
                                         spQuery.ViewFields = string.Empty;
-                                        foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                        objParams.Each(objParam =>
                                         {
                                             spQuery.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
-                                        }
+                                        });
                                     }
                                     else
                                     {
@@ -377,7 +377,7 @@ namespace GenericDataObject
                                         if (mapperDelegate == null)
                                         {
 
-                                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                            objParams.Each(objParam =>
                                             {
                                                 string fieldName = objParam.GetFieldNameOrDefault();
 
@@ -409,7 +409,7 @@ namespace GenericDataObject
                                                 }
 
                                                 #endregion
-                                            }
+                                            });
                                         }
                                         else
                                         {
@@ -473,14 +473,14 @@ namespace GenericDataObject
                                 SPListItem item = list.GetItemById(Convert.ToInt32(itemToUpdate.GetType().GetProperty("ID").GetValue(itemToUpdate, null)));
                                 if (mapperDelegate == null)
                                 {
-                                    foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                    objParams.Each(objParam =>
                                     {
                                         if (objParam.Name != "ID")
                                         {
                                             string fieldName = objParam.GetFieldNameOrDefault();
                                             item[fieldName] = objParam.GetValue(itemToUpdate, null);
                                         }
-                                    }
+                                    });
                                 }
                                 else
                                 {
