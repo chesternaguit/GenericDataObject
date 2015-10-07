@@ -123,3 +123,5 @@ public class BO_Person
 <li>Enhance property type conversion handling</li>
 <li>Attributes for properties or fields to be skipped when retrieving data</li>
 </ul>
+
+*NOTE: This project's development is still in progress and has not been fully tested
