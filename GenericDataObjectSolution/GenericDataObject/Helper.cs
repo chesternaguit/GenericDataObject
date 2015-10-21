@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.SharePoint;
-using System.Configuration;
-using System.IO;
 using System.Reflection;
-using System.Collections;
+using Microsoft.SharePoint.Utilities;
+using System.Net.Mail;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+using System.ComponentModel;
 
 namespace GenericDataObject
 {
@@ -68,6 +70,48 @@ namespace GenericDataObject
                 }
             }
             return userName;
+        }
+
+        public static void SendEmail(string siteURL, string emailFrom, string emailTo, string emailSubject, string htmlBody)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(emailTo))
+                {
+                    bool result = false;
+
+                    using (SPSite _site = new SPSite(siteURL))
+                    {
+                        using (SPWeb _web = _site.OpenWeb())
+                        {
+                            bool appendHtmlTag = true;
+                            bool htmlEncode = false;
+
+                            SPSecurity.RunWithElevatedPrivileges(delegate()
+                            {
+                                result = SPUtility.SendEmail(_web, appendHtmlTag, htmlEncode, emailTo, emailSubject, htmlBody);
+                            });
+                        }
+                    }
+
+                    if (result == false)
+                    {
+                        SPSecurity.RunWithElevatedPrivileges(delegate()
+                        {
+                            using (MailMessage message = new MailMessage(SPContext.Current.Site.WebApplication.OutboundMailSenderAddress, emailTo, emailSubject, htmlBody))
+                            {
+                                message.IsBodyHtml = true;
+                                SmtpClient client = new SmtpClient(SPContext.Current.Site.WebApplication.OutboundMailServiceInstance.Server.Address);
+                                client.Send(message);
+                            }
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Helper: SendEmail:" + ex.Message);
+            }
         }
 
         public static byte[] ImageToByteArray(System.Drawing.Image imageIn)
@@ -252,4 +296,81 @@ namespace GenericDataObject
             this.useClassName = useClassName;
         }
     }
+    
+    //credits to Matthew Yarlett
+    //https://social.msdn.microsoft.com/Forums/office/en-US/92c1a750-0624-4887-b0f0-1c61234ab6b3/saving-file-to-another-server-using-c?forum=sharepointdevelopmentprevious#11691439-640e-49a7-a185-3a87328910d0
+    public class Impersonator : IDisposable
+    {
+        public Impersonator(string userName, string domainName, string password)
+        {
+            ImpersonateValidUser(userName, domainName, password);
+        }
+
+        public void Dispose()
+        {
+            UndoImpersonation();
+        }
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern int LogonUser(string lpszUserName, string lpszDomain, string lpszPassword, int dwLogonType, int dwLogonProvider, ref IntPtr phToken);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int DuplicateToken(IntPtr hToken, int impersonationLevel, ref IntPtr hNewToken);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern bool RevertToSelf();
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+        private static extern bool CloseHandle(IntPtr handle);
+
+        private const int LOGON32_LOGON_INTERACTIVE = 2;
+        private const int LOGON32_PROVIDER_DEFAULT = 0;
+
+        private WindowsImpersonationContext _impersonationContext = null;
+
+        private void ImpersonateValidUser(string userName, string domain, string password)
+        {
+            IntPtr token = IntPtr.Zero;
+            IntPtr tokenDuplicate = IntPtr.Zero;
+
+            try
+            {
+                if (!RevertToSelf())
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+
+                if (LogonUser(userName, domain, password, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, ref token) == 0)
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+                if (DuplicateToken(token, 2, ref tokenDuplicate) == 0)
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+                var tempWindowsIdentity = new WindowsIdentity(tokenDuplicate);
+                _impersonationContext = tempWindowsIdentity.Impersonate();
+            }
+            finally
+            {
+                if (token != IntPtr.Zero)
+                {
+                    CloseHandle(token);
+                }
+                if (tokenDuplicate != IntPtr.Zero)
+                {
+                    CloseHandle(tokenDuplicate);
+                }
+            }
+        }
+
+        private void UndoImpersonation()
+        {
+            if (_impersonationContext != null)
+            {
+                _impersonationContext.Undo();
+            }
+        }
+    }
+
 }
