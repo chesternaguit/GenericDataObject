@@ -29,7 +29,8 @@ namespace GenericDataObject
 
         public static bool Create(TModel newItem)
         {
-            return Create(newItem, System.Data.CommandType.Text, string.Empty);
+            object tmp = null;
+            return Create(newItem, System.Data.CommandType.Text, string.Empty, out tmp);
         }
 
         public static bool Create(TModel newItem, System.Data.CommandType commandType, string commandText)
@@ -160,24 +161,29 @@ namespace GenericDataObject
                                     foreach (var objParam in objParams)
                                     {
                                         Object value = null;
+                                        string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        #region value = Convert.ToType(xReader[objParam.Name]);
+                                        #region value = Convert.ToType(xReader[fieldName]);
 
                                         if (objParam.PropertyType == typeof(int))
                                         {
-                                            value = Convert.ToInt32(xReader[objParam.Name]);
+                                            value = Convert.ToInt32(xReader[fieldName]);
                                         }
                                         else if (objParam.PropertyType == typeof(decimal))
                                         {
-                                            value = Convert.ToDecimal(xReader[objParam.Name]);
+                                            value = Convert.ToDecimal(xReader[fieldName]);
                                         }
                                         else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
                                         {
-                                            value = Enum.Parse(objParam.PropertyType, xReader[objParam.Name].ToString());
+                                            value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
+                                        }
+                                        else if (objParam.PropertyType == typeof(string))
+                                        {
+                                            value = xReader[fieldName].ToString();
                                         }
                                         else
                                         {
-                                            value = xReader[objParam.Name];
+                                            value = xReader[fieldName];
                                         }
 
                                         #endregion
@@ -215,17 +221,17 @@ namespace GenericDataObject
 
         public static List<TModel> GetAll()
         {
-            return GetAll(System.Data.CommandType.Text, "", null);
+            return GetAll(System.Data.CommandType.Text, string.Empty, null);
         }
 
         public static List<TModel> GetAll(Predicate<TModel> predicate)
         {
-            return (from x in GetAll(System.Data.CommandType.Text, "", null)
+            return (from x in GetAll(System.Data.CommandType.Text, string.Empty, null)
                     where predicate.Invoke(x)
                     select x).ToList();
         }
 
-        public static List<TModel> GetAll(System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public static List<TModel> GetAll(System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters)
         {
             List<TModel> allItems = new List<TModel>();
 
@@ -243,7 +249,7 @@ namespace GenericDataObject
                         using (SqlCommand xCom = new SqlCommand())
                         {
                             xCom.Connection = xCon;
-                            xCom.CommandText = string.IsNullOrEmpty(commandText) ? string.Format("Select * From {0}", sqlTable) : commandText;
+                            xCom.CommandText = commandText ?? string.Format("Select * From {0}", sqlTable);
                             xCom.CommandType = commandType;
                             if (commandParameters != null)
                             {
@@ -280,6 +286,10 @@ namespace GenericDataObject
                                         {
                                             var value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
                                             objParam.SetValue(tmpItem, value, null);
+                                        }
+                                        else if (objParam.PropertyType == typeof(string))
+                                        {
+                                            objParam.SetValue(tmpItem, xReader[fieldName].ToString(), null);
                                         }
                                         else
                                         {
@@ -323,7 +333,7 @@ namespace GenericDataObject
         public static bool Update(TModel itemToUpdate)
         {
             int tmp = 0;
-            return Update(itemToUpdate, out tmp);
+            return Update(itemToUpdate, System.Data.CommandType.Text, string.Empty, null, out tmp);
         }
 
         public static bool Update(TModel itemToUpdate, out int rowsAffected)
@@ -331,13 +341,13 @@ namespace GenericDataObject
             return Update(itemToUpdate, System.Data.CommandType.Text, string.Empty, null, out rowsAffected);
         }
 
-        public static bool Update(TModel itemToUpdate, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public static bool Update(TModel itemToUpdate, System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters)
         {
             int tmp = 0;
             return Update(itemToUpdate, commandType, commandText, commandParameters, out tmp);
         }
 
-        public static bool Update(TModel itemToUpdate, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters, out int rowsAffected)
+        public static bool Update(TModel itemToUpdate, System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters, out int rowsAffected)
         {
             bool xBool = false;
             rowsAffected = 0;
@@ -446,13 +456,13 @@ namespace GenericDataObject
             return Delete(itemToDelete, System.Data.CommandType.Text, string.Empty, null, out rowsAffected);
         }
 
-        public static bool Delete(TModel itemToDelete, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public static bool Delete(TModel itemToDelete, System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters)
         {
             int tmp = 0;
             return Delete(itemToDelete, commandType, commandText, commandParameters, out tmp);
         }
 
-        public static bool Delete(TModel itemToDelete, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters, out int rowsAffected)
+        public static bool Delete(TModel itemToDelete, System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters, out int rowsAffected)
         {
             bool xBool = false;
             rowsAffected = 0;
@@ -529,7 +539,7 @@ namespace GenericDataObject
             SQLTableNameAttribute tableNameAttribute = (SQLTableNameAttribute)typeof(TModel).GetCustomAttributes(typeof(SQLTableNameAttribute), false).FirstOrDefault();
             if (tableNameAttribute != null)
             {
-                sqlTable = tableNameAttribute.useClassName ? typeof(TModel).Name : (tableNameAttribute.tableName ?? sqlTable); 
+                sqlTable = tableNameAttribute.useClassName ? typeof(TModel).Name : (tableNameAttribute.tableName ?? sqlTable);
             }
             if (string.IsNullOrEmpty(sqlTable))
             {
