@@ -307,12 +307,12 @@ namespace GenericDataObject
 
         public static List<TModel> GetAll()
         {
-            return GetAll(query: null);
+            return GetAll(null, null);
         }
 
         public static List<TModel> GetAll(Predicate<TModel> predicate)
         {
-            return (from x in GetAll(query: null)
+            return (from x in GetAll(null, null)
                     where predicate.Invoke(x)
                     select x).ToList();
         }
