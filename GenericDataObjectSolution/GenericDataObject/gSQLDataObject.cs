@@ -70,7 +70,7 @@ namespace GenericDataObject
                             int initCtr = 0;
                             objParams.Each(objParam =>
                             {
-                                if (objParam.Name != "ID")
+                                if (objParam.Name != "ID" && !objParam.IgnoreField())
                                 {
                                     string fieldName = objParam.GetFieldNameOrDefault();
                                     string separator = initCtr == 0 ? string.Empty : ",";
@@ -95,7 +95,7 @@ namespace GenericDataObject
 
                         objParams.Each(objParam =>
                         {
-                            if (objParam.Name != "ID")
+                            if (objParam.Name != "ID" && !objParam.IgnoreField())
                             {
                                 string fieldName = objParam.GetFieldNameOrDefault();
                                 xCom.Parameters.AddWithValue("@" + fieldName, objParam.GetValue(newItem, null));
@@ -163,30 +163,33 @@ namespace GenericDataObject
                                         Object value = null;
                                         string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        #region value = Convert.ToType(xReader[fieldName]);
+                                        if (!objParam.IgnoreField())
+                                        {
+                                            #region value = Convert.ToType(xReader[fieldName]);
 
-                                        if (objParam.PropertyType == typeof(int))
-                                        {
-                                            value = Convert.ToInt32(xReader[fieldName]);
-                                        }
-                                        else if (objParam.PropertyType == typeof(decimal))
-                                        {
-                                            value = Convert.ToDecimal(xReader[fieldName]);
-                                        }
-                                        else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                        {
-                                            value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
-                                        }
-                                        else if (objParam.PropertyType == typeof(string))
-                                        {
-                                            value = xReader[fieldName].ToString();
-                                        }
-                                        else
-                                        {
-                                            value = xReader[fieldName];
-                                        }
+                                            if (objParam.PropertyType == typeof(int))
+                                            {
+                                                value = Convert.ToInt32(xReader[fieldName]);
+                                            }
+                                            else if (objParam.PropertyType == typeof(decimal))
+                                            {
+                                                value = Convert.ToDecimal(xReader[fieldName]);
+                                            }
+                                            else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                            {
+                                                value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
+                                            }
+                                            else if (objParam.PropertyType == typeof(string))
+                                            {
+                                                value = xReader[fieldName].ToString();
+                                            }
+                                            else
+                                            {
+                                                value = xReader[fieldName];
+                                            }
 
-                                        #endregion
+                                            #endregion 
+                                        }
 
                                         objParam.SetValue(theItem, value, null);
                                     }
@@ -221,12 +224,12 @@ namespace GenericDataObject
 
         public static List<TModel> GetAll()
         {
-            return GetAll(System.Data.CommandType.Text, string.Empty, null);
+            return GetAll(System.Data.CommandType.Text, null, null);
         }
 
         public static List<TModel> GetAll(Predicate<TModel> predicate)
         {
-            return (from x in GetAll(System.Data.CommandType.Text, string.Empty, null)
+            return (from x in GetAll(System.Data.CommandType.Text, null, null)
                     where predicate.Invoke(x)
                     select x).ToList();
         }
@@ -270,33 +273,36 @@ namespace GenericDataObject
                                     {
                                         string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        #region value = Convert.ToType(xReader[fieldName]);
+                                        if (!objParam.IgnoreField())
+                                        {
+                                            #region value = Convert.ToType(xReader[fieldName]);
 
-                                        if (objParam.PropertyType == typeof(int))
-                                        {
-                                            int value = Convert.ToInt32(xReader[fieldName]);
-                                            objParam.SetValue(tmpItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType == typeof(decimal))
-                                        {
-                                            decimal value = Convert.ToDecimal(xReader[fieldName]);
-                                            objParam.SetValue(tmpItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                        {
-                                            var value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
-                                            objParam.SetValue(tmpItem, value, null);
-                                        }
-                                        else if (objParam.PropertyType == typeof(string))
-                                        {
-                                            objParam.SetValue(tmpItem, xReader[fieldName].ToString(), null);
-                                        }
-                                        else
-                                        {
-                                            objParam.SetValue(tmpItem, xReader[fieldName], null);
-                                        }
+                                            if (objParam.PropertyType == typeof(int))
+                                            {
+                                                int value = Convert.ToInt32(xReader[fieldName]);
+                                                objParam.SetValue(tmpItem, value, null);
+                                            }
+                                            else if (objParam.PropertyType == typeof(decimal))
+                                            {
+                                                decimal value = Convert.ToDecimal(xReader[fieldName]);
+                                                objParam.SetValue(tmpItem, value, null);
+                                            }
+                                            else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                            {
+                                                var value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
+                                                objParam.SetValue(tmpItem, value, null);
+                                            }
+                                            else if (objParam.PropertyType == typeof(string))
+                                            {
+                                                objParam.SetValue(tmpItem, xReader[fieldName].ToString(), null);
+                                            }
+                                            else
+                                            {
+                                                objParam.SetValue(tmpItem, xReader[fieldName], null);
+                                            }
 
-                                        #endregion
+                                            #endregion 
+                                        }
 
                                     });
                                     allItems.Add(tmpItem);
@@ -374,7 +380,7 @@ namespace GenericDataObject
                             int initCtr = 0;
                             objParams.Each(objParam =>
                             {
-                                if (objParam.Name != "ID")
+                                if (objParam.Name != "ID" && !objParam.IgnoreField())
                                 {
                                     string fieldName = objParam.GetFieldNameOrDefault();
                                     string separator = initCtr == 0 ? string.Empty : ",";
@@ -411,7 +417,10 @@ namespace GenericDataObject
                         {
                             objParams.Each(objParam =>
                             {
-                                xCom.Parameters.AddWithValue("@" + objParam.GetFieldNameOrDefault(), objParam.GetValue(itemToUpdate, null));
+                                if (!objParam.IgnoreField())
+                                {
+                                    xCom.Parameters.AddWithValue("@" + objParam.GetFieldNameOrDefault(), objParam.GetValue(itemToUpdate, null)); 
+                                }
                             });
                         }
 
