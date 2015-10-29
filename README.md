@@ -115,7 +115,7 @@ public class BO_Person
 ```
 
 
-<h4>..OR YOU MAY JUST USE IT HOWEVER YOU LIKE</h4>
+<h4>..OR YOU MAY JUST USE IT WHICHEVER YOU LIKE</h4>
 
 
 <h3>TODO</h3>
