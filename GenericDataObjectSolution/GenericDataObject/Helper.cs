@@ -245,7 +245,16 @@ namespace GenericDataObject
             if (fieldNameAttribute != null) fieldName = fieldNameAttribute.fieldName ?? fieldName;
             return fieldName;
         }
-
+        /// <summary>
+        /// Checks whether the property has IgnorePropertyAttribute, and return the ignoreProperty value of the attribute. Return false if the attribute is not set
+        /// </summary>
+        /// <param name="propertyInfo"></param>
+        /// <returns></returns>
+        public static bool IgnoreField(this PropertyInfo propertyInfo)
+        {
+            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
+            return ignorePropertyAttribute == null ? false : ignorePropertyAttribute.ignoreProperty;
+        }
     }
     /// <summary>
     /// a property or field attribute that specifies if the field is to be ignored when retreiving data. best use for computed field
