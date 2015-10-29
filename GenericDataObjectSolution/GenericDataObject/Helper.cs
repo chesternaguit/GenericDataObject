@@ -248,6 +248,22 @@ namespace GenericDataObject
 
     }
     /// <summary>
+    /// a property or field attribute that specifies if the field is to be ignored when retreiving data. best use for computed field
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    public class IgnorePropertyAttribute : Attribute
+    {
+        public bool ignoreProperty { get; set; }
+        public IgnorePropertyAttribute() 
+        {
+            this.ignoreProperty = true;
+        }
+        public IgnorePropertyAttribute(bool ignoreProperty)
+        {
+            this.ignoreProperty = ignoreProperty;
+        }
+    }
+    /// <summary>
     /// a property or field attribute that specifies the internal name of the field that the target is associated
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
