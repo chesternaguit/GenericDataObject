@@ -53,7 +53,7 @@ namespace GenericDataObject
                                 {
                                     objParams.Each(objParam =>
                                     {
-                                        if (objParam.Name != "ID")
+                                        if (objParam.Name != "ID" && !objParam.IgnoreField())
                                         {
                                             string fieldName = objParam.GetFieldNameOrDefault();
                                             item[fieldName] = objParam.GetValue(newItem, null);
@@ -140,29 +140,32 @@ namespace GenericDataObject
                                             {
                                                 string fieldName = objParam.GetFieldNameOrDefault();
 
-                                                if (objParam.PropertyType == typeof(int))
+                                                if (!objParam.IgnoreField())
                                                 {
-                                                    int value = Convert.ToInt32(item[fieldName]);
-                                                    objParam.SetValue(theItem, value, null);
-                                                }
-                                                else if (objParam.PropertyType == typeof(decimal))
-                                                {
-                                                    decimal value = Convert.ToDecimal(item[fieldName]);
-                                                    objParam.SetValue(theItem, value, null);
-                                                }
-                                                else if (objParam.PropertyType == typeof(SPUser))
-                                                {
-                                                    SPUser value = Helper.GetSPUser(item, fieldName);
-                                                    objParam.SetValue(theItem, value, null);
-                                                }
-                                                else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                                {
-                                                    var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                                    objParam.SetValue(theItem, value, null);
-                                                }
-                                                else
-                                                {
-                                                    objParam.SetValue(theItem, item[fieldName], null);
+                                                    if (objParam.PropertyType == typeof(int))
+                                                    {
+                                                        int value = Convert.ToInt32(item[fieldName]);
+                                                        objParam.SetValue(theItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType == typeof(decimal))
+                                                    {
+                                                        decimal value = Convert.ToDecimal(item[fieldName]);
+                                                        objParam.SetValue(theItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType == typeof(SPUser))
+                                                    {
+                                                        SPUser value = Helper.GetSPUser(item, fieldName);
+                                                        objParam.SetValue(theItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                                    {
+                                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                                        objParam.SetValue(theItem, value, null);
+                                                    }
+                                                    else
+                                                    {
+                                                        objParam.SetValue(theItem, item[fieldName], null);
+                                                    } 
                                                 }
                                             });
                                         }
@@ -247,29 +250,32 @@ namespace GenericDataObject
                                             {
                                                 string fieldName = objParam.GetFieldNameOrDefault();
 
-                                                if (objParam.PropertyType == typeof(int))
+                                                if (!objParam.IgnoreField())
                                                 {
-                                                    int value = Convert.ToInt32(item[fieldName]);
-                                                    objParam.SetValue(theItem, value, null);
-                                                }
-                                                else if (objParam.PropertyType == typeof(decimal))
-                                                {
-                                                    decimal value = Convert.ToDecimal(item[fieldName]);
-                                                    objParam.SetValue(theItem, value, null);
-                                                }
-                                                else if (objParam.PropertyType == typeof(SPUser))
-                                                {
-                                                    SPUser value = Helper.GetSPUser(item, fieldName);
-                                                    objParam.SetValue(theItem, value, null);
-                                                }
-                                                else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                                {
-                                                    var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                                    objParam.SetValue(theItem, value, null);
-                                                }
-                                                else
-                                                {
-                                                    objParam.SetValue(theItem, item[fieldName], null);
+                                                    if (objParam.PropertyType == typeof(int))
+                                                    {
+                                                        int value = Convert.ToInt32(item[fieldName]);
+                                                        objParam.SetValue(theItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType == typeof(decimal))
+                                                    {
+                                                        decimal value = Convert.ToDecimal(item[fieldName]);
+                                                        objParam.SetValue(theItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType == typeof(SPUser))
+                                                    {
+                                                        SPUser value = Helper.GetSPUser(item, fieldName);
+                                                        objParam.SetValue(theItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                                    {
+                                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                                        objParam.SetValue(theItem, value, null);
+                                                    }
+                                                    else
+                                                    {
+                                                        objParam.SetValue(theItem, item[fieldName], null);
+                                                    } 
                                                 }
                                             });
                                         }
@@ -380,35 +386,37 @@ namespace GenericDataObject
                                             objParams.Each(objParam =>
                                             {
                                                 string fieldName = objParam.GetFieldNameOrDefault();
+                                                if (!objParam.IgnoreField())
+                                                {
+                                                    #region TheType value = Convert.ToType(item[fieldName]); objParam.SetValue(tmpItem, value, null);
 
-                                                #region TheType value = Convert.ToType(item[fieldName]); objParam.SetValue(tmpItem, value, null);
+                                                    if (objParam.PropertyType == typeof(int))
+                                                    {
+                                                        int value = Convert.ToInt32(item[fieldName]);
+                                                        objParam.SetValue(tmpItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType == typeof(decimal))
+                                                    {
+                                                        decimal value = Convert.ToDecimal(item[fieldName]);
+                                                        objParam.SetValue(tmpItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType == typeof(SPUser))
+                                                    {
+                                                        SPUser value = Helper.GetSPUser(item, fieldName);
+                                                        objParam.SetValue(tmpItem, value, null);
+                                                    }
+                                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                                    {
+                                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                                        objParam.SetValue(tmpItem, value, null);
+                                                    }
+                                                    else
+                                                    {
+                                                        objParam.SetValue(tmpItem, item[fieldName], null);
+                                                    }
 
-                                                if (objParam.PropertyType == typeof(int))
-                                                {
-                                                    int value = Convert.ToInt32(item[fieldName]);
-                                                    objParam.SetValue(tmpItem, value, null);
+                                                    #endregion 
                                                 }
-                                                else if (objParam.PropertyType == typeof(decimal))
-                                                {
-                                                    decimal value = Convert.ToDecimal(item[fieldName]);
-                                                    objParam.SetValue(tmpItem, value, null);
-                                                }
-                                                else if (objParam.PropertyType == typeof(SPUser))
-                                                {
-                                                    SPUser value = Helper.GetSPUser(item, fieldName);
-                                                    objParam.SetValue(tmpItem, value, null);
-                                                }
-                                                else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                                {
-                                                    var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                                    objParam.SetValue(tmpItem, value, null);
-                                                }
-                                                else
-                                                {
-                                                    objParam.SetValue(tmpItem, item[fieldName], null);
-                                                }
-
-                                                #endregion
                                             });
                                         }
                                         else
@@ -475,7 +483,7 @@ namespace GenericDataObject
                                 {
                                     objParams.Each(objParam =>
                                     {
-                                        if (objParam.Name != "ID")
+                                        if (objParam.Name != "ID" && !objParam.IgnoreField())
                                         {
                                             string fieldName = objParam.GetFieldNameOrDefault();
                                             item[fieldName] = objParam.GetValue(itemToUpdate, null);
