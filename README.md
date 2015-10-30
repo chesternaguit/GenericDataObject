@@ -39,6 +39,15 @@ public class Person
     //to specify SharePoint List's Internal Name
     [FieldName("Primary_x0020_Address")]
     public string PrimaryAddress { get; set; }
+    
+    //add the IgnoreProperty attribute to specify properties
+    //that are not to be retrieved from the SharePoint List or SQL Table
+    //can be applied to computed Properties
+    [IgnoreProperty()]
+    public string FullName
+    {
+        get { return FirstName + " " + LastName; }
+    }
 }
 ```
 
