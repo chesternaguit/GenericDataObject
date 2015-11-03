@@ -35,6 +35,24 @@ namespace GenericDataObject
             }
             return null;
         }
+        
+        /// <summary>
+        /// returns a List of type SPUser
+        /// </summary>
+        /// <param name="item">the SPListItem where the list of SPUsers will be extracted</param>
+        /// <param name="key">the field name</param>
+        /// <returns></returns>
+        public static List<SPUser> GetSPUsers(SPListItem item, string key)
+        {
+            List<SPUser> users = new List<SPUser>();
+            string value = item[key] as string;
+            SPFieldUserValueCollection userVals = new SPFieldUserValueCollection(item.Web, key);
+            foreach (SPFieldUserValue userVal in userVals)
+            {
+                users.Add(userVal.User);
+            }
+            return users;
+        }
 
         public static SPGroup GetSPGroup(SPListItem item, string key)
         {
@@ -279,10 +297,20 @@ namespace GenericDataObject
     public class FieldNameAttribute : Attribute
     {
         public string fieldName { get; set; }
+        public Guid fieldID { get; set; }
+        public int index { get; set; }
         public FieldNameAttribute() { }
         public FieldNameAttribute(string fieldName)
         {
             this.fieldName = fieldName;
+        }
+        public FieldNameAttribute(Guid fieldID)
+        {
+            this.fieldID = fieldID;
+        }
+        public FieldNameAttribute(int index)
+        {
+            this.index = index;
         }
     }
     /// <summary>
