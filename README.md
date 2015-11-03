@@ -132,4 +132,4 @@ public class BO_Person
 <li>Enhance property type conversion handling</li>
 </ul>
 
-*NOTE: This project's development is still in progress and has not been fully tested
+*NOTE: This project is still a work in progress and has not been fully tested
