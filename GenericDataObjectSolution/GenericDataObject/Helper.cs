@@ -273,6 +273,10 @@ namespace GenericDataObject
             IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
             return ignorePropertyAttribute == null ? false : ignorePropertyAttribute.ignoreProperty;
         }
+        public static string NullIfEmpty(this string value)
+        {
+            return value == string.empty ? null : value;
+        }
     }
     /// <summary>
     /// a property or field attribute that specifies if the field is to be ignored when retreiving data. best use for computed field
