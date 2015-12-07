@@ -9,7 +9,7 @@ The generic classes will be the one communicating with the database/sharepoint t
 
 <h4>WHY?</h4>
 
-There might be instances that you will be working on an existing project where using Entity Framework is just not applicable and you plan on implementing Multi-Tier Architecture on that project, where sometimes, you separate the Presentation, Business Logic, and the Data Access Layer, and most often, some projects involved multiple models and you will have to write separate classes for accessing data for each model and you find it to be a repetitive and tedious task.
+There might be instances that you will be working on an existing project and you plan on implementing Multi-Tier Architecture , where you separate the Presentation (User Interface), Business Logic (Code-Behind), and the Data Access Layer, and most often, some projects involved multiple models and you will have to write separate classes for accessing data for each model and you find it to be a repetitive task.
 
 
 <h4>SETTING UP YOUR MODEL</h4>
