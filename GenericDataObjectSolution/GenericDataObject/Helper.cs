@@ -277,6 +277,20 @@ namespace GenericDataObject
         {
             return value == string.empty ? null : value;
         }
+        public static string ToCsvString<TSource>(this IEnumerable<TSource> items)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            PropertyInfo[] props = typeof(TSource).GetProperties();
+            foreach (TSource items in items)
+            {
+                foreach (PropertyInfo prop in props)
+                {
+                    stringBuilder.AppendFormat("{0}, ", prop.GetValue(item, null));
+                }
+                stringBuilder.AppendLine();
+            }
+            return stringBuilder.ToString();
+        }
     }
     /// <summary>
     /// a property or field attribute that specifies if the field is to be ignored when retreiving data. best use for computed field
