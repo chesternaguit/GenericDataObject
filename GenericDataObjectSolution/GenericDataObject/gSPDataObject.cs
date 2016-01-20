@@ -129,7 +129,7 @@ namespace GenericDataObject
                                     query.ViewFields = string.Empty;
                                     objParams.Each(objParam =>
                                     {
-                                        query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.Name);
+                                        query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
                                     });
                                     SPListItemCollection items = list.GetItems(query);
                                     foreach (SPListItem item in items)
