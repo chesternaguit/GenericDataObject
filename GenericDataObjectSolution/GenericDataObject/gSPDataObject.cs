@@ -86,6 +86,64 @@ namespace GenericDataObject
             return xBool;
         }
 
+        public static bool BatchCreate(IEnumerable<TModel> newItems, string createBuilder, ref string errorMessage)
+        {
+            errorMessage = string.Empty;
+            try
+            {
+                hasConnectionString();
+                hasSpList();
+                StringBuilder _createBuilder = new StringBuilder();
+                Action secureCode = () =>
+                {
+                    using (SPSite site = userToken == null ? new SPSite(ConnectionString) : new SPSite(ConnectionString, userToken))
+                    {
+                        using (SPWeb web = site.OpenWeb())
+                        {
+                            web.AllowUnsafeUpdates = true;
+                            System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
+                            SPList list = web.Lists.TryGetList(spList);
+                            if (list == null)
+                            {
+                                throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
+                            }
+                            if (createBuilder == null)
+                            {
+                                _createBuilder.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Batch>");
+                                foreach (TModel newItem in newItems)
+                                {
+                                    _createBuilder.AppendFormat("<Method><SetList Scope=\"Request\">{0}</SetList><SetVar Name=\"ID\">New</SetVar><SetVar Name=\"Cmd\">Save</SetVar>",
+                                        list.ID);
+                                    objParams.Each(objParam =>
+                                    {
+                                        if (objParam.Name != "ID")
+                                        {
+                                            string fieldName = objParam.GetFieldNameOrDefault();
+                                            _createBuilder.AppendFormat("<SetVar Name=\"urn:schemas-microsoft-com:office:office#{0}\">{1}</SetVar>", fieldName, objParam.GetValue(newItem, null));
+                                        }
+                                    });
+                                    _createBuilder.Append("</Method>");
+                                }
+                                _createBuilder.Append("</Batch>");
+                                web.ProcessBatchData(_createBuilder.ToString());
+                            }
+                            else
+                            {
+                                web.ProcessBatchData(createBuilder);
+                            }
+                            web.AllowUnsafeUpdates = false;
+                        }
+                    }
+                };//end secure code
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
+        }
+
         #endregion
 
         #region Read
@@ -516,6 +574,68 @@ namespace GenericDataObject
             return xBool;
         }
 
+        public static bool BatchUpdate(IEnumerable<TModel> newItems, string updateBuilder, ref string errorMessage)
+        {
+            errorMessage = string.Empty;
+            try
+            {
+                hasConnectionString();
+                hasSpList();
+                StringBuilder _updateBuilder = new StringBuilder();
+                Action secureCode = () =>
+                {
+                    using (SPSite site = userToken == null ? new SPSite(ConnectionString) : new SPSite(ConnectionString, userToken))
+                    {
+                        using (SPWeb web = site.OpenWeb())
+                        {
+                            web.AllowUnsafeUpdates = true;
+                            System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
+                            SPList list = web.Lists.TryGetList(spList);
+                            if (list == null)
+                            {
+                                throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
+                            }
+                            if (updateBuilder == null)
+                            {
+                                _updateBuilder.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Batch>");
+                                foreach (TModel newItem in newItems)
+                                {
+                                    _updateBuilder.AppendFormat("<Method><SetList Scope=\"Request\">{0}</SetList><SetVar Name=\"Cmd\">Save</SetVar>",
+                                        list.ID);
+                                    objParams.Each(objParam =>
+                                    {
+                                        if (objParam.Name == "ID")
+                                        {
+                                            _updateBuilder.AppendFormat("<SetVar Name=\"ID\">{0}</SetVar>", objParam.GetValue(newItem, null).ToString());
+                                        }
+                                        else
+                                        {
+                                            string fieldName = objParam.GetFieldNameOrDefault();
+                                            _updateBuilder.AppendFormat("<SetVar Name=\"urn:schemas-microsoft-com:office:office#{0}\">{1}</SetVar>", fieldName, objParam.GetValue(newItem, null));
+                                        }
+                                    });
+                                    _updateBuilder.Append("</Method>");
+                                }
+                                _updateBuilder.Append("</Batch>");
+                                web.ProcessBatchData(_updateBuilder.ToString());
+                            }
+                            else
+                            {
+                                web.ProcessBatchData(updateBuilder);
+                            }
+                            web.AllowUnsafeUpdates = false;
+                        }
+                    }
+                };//end secure code
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
+        }
+        
         #endregion
 
         #region Delete
