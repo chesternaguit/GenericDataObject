@@ -135,6 +135,14 @@ namespace GenericDataObject
                         }
                     }
                 };//end secure code
+                if (userToken == null)
+                {
+                    SPSecurity.RunWithElevatedPrivileges(delegate() { secureCode.Invoke(); });
+                }
+                else
+                {
+                    secureCode.Invoke();
+                }
                 return true;
             }
             catch (Exception ex)
@@ -627,6 +635,14 @@ namespace GenericDataObject
                         }
                     }
                 };//end secure code
+                if (userToken == null)
+                {
+                    SPSecurity.RunWithElevatedPrivileges(delegate() { secureCode.Invoke(); });
+                }
+                else
+                {
+                    secureCode.Invoke();
+                }
                 return true;
             }
             catch (Exception ex)
