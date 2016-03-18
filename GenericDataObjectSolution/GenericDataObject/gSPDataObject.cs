@@ -30,8 +30,13 @@ namespace GenericDataObject
 
         public static bool Create(TModel newItem, Action<TModel, SPListItem> mapperDelegate)
         {
+            int _dumpIdentity = 0;
+            return Create(newItem, mapperDelegate, out _dumpIdentity);
+        }
+        public static bool Create(TModel newItem, Action<TModel, SPListItem> mapperDelegate, out int identity)
+        {
             bool xBool = false;
-
+            int _identity = 0;
             try
             {
                 hasConnectionString();
@@ -65,6 +70,7 @@ namespace GenericDataObject
                                     mapperDelegate(newItem, item);
                                 }
                                 item.Update();
+                                _identity = item.ID;
                                 xBool = true;
                             }
                         }
@@ -77,12 +83,14 @@ namespace GenericDataObject
                 {
                     secureCode.Invoke();
                 }
+                identity = _identity;
             }
             catch (Exception ex)
             {
+                identity = _identity;
                 throw new Exception("Generic SP Data Object Create Method: " + ex.Message + "\n" + ex.StackTrace);
             }
-
+            
             return xBool;
         }
 
