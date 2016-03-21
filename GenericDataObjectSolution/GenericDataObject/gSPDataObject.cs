@@ -124,7 +124,7 @@ namespace GenericDataObject
                                         list.ID);
                                     objParams.Each(objParam =>
                                     {
-                                        if (objParam.Name != "ID")
+                                        if (objParam.Name != "ID" && !objParam.IgnoreField())
                                         {
                                             string fieldName = objParam.GetFieldNameOrDefault();
                                             _createBuilder.AppendFormat("<SetVar Name=\"urn:schemas-microsoft-com:office:office#{0}\">{1}</SetVar>", fieldName, objParam.GetValue(newItem, null));
@@ -624,7 +624,7 @@ namespace GenericDataObject
                                         {
                                             _updateBuilder.AppendFormat("<SetVar Name=\"ID\">{0}</SetVar>", objParam.GetValue(newItem, null).ToString());
                                         }
-                                        else
+                                        else if(!objParam.IgnoreField())
                                         {
                                             string fieldName = objParam.GetFieldNameOrDefault();
                                             _updateBuilder.AppendFormat("<SetVar Name=\"urn:schemas-microsoft-com:office:office#{0}\">{1}</SetVar>", fieldName, objParam.GetValue(newItem, null));
