@@ -25,15 +25,22 @@ namespace GenericDataObject
 
         public static bool Create(TModel newItem)
         {
-            return Create(newItem, null);
+            int _dumpIdentity = 0;
+            return Create(newItem, null, null, out _dumpIdentity);
         }
 
         public static bool Create(TModel newItem, Action<TModel, SPListItem> mapperDelegate)
         {
             int _dumpIdentity = 0;
-            return Create(newItem, mapperDelegate, out _dumpIdentity);
+            return Create(newItem, mapperDelegate, null, out _dumpIdentity);
         }
+        
         public static bool Create(TModel newItem, Action<TModel, SPListItem> mapperDelegate, out int identity)
+        {
+            return Create(newItem, mapperDelegate, null, out identity);
+        }
+        
+        public static bool Create(TModel newItem, Action<TModel, SPListItem> mapperDelegate, Action<SPWeb, SPList> afterCreateDelegate, out int identity)
         {
             bool xBool = false;
             int _identity = 0;
@@ -72,6 +79,7 @@ namespace GenericDataObject
                                 item.Update();
                                 _identity = item.ID;
                                 xBool = true;
+                                if (afterCreateDelegate != null) { afterCreateDelegate(web, list); }
                             }
                         }
                     };
@@ -95,6 +103,11 @@ namespace GenericDataObject
         }
 
         public static bool BatchCreate(IEnumerable<TModel> newItems, string createBuilder, ref string errorMessage)
+        {
+            return BatchCreate(newItems, createBuilder, null, ref errorMessage);
+        }
+        
+        public static bool BatchCreate(IEnumerable<TModel> newItems, string createBuilder, Action<SPWeb, SPList> afterCreateDelegate, ref string errorMessage)
         {
             errorMessage = string.Empty;
             try
@@ -139,6 +152,7 @@ namespace GenericDataObject
                             {
                                 web.ProcessBatchData(createBuilder);
                             }
+                            if (afterCreateDelegate != null) { afterCreateDelegate(web, list); }
                             web.AllowUnsafeUpdates = false;
                         }
                     }
@@ -166,10 +180,15 @@ namespace GenericDataObject
 
         public static TModel GetItemByID(int id)
         {
-            return GetItemByID(id, null);
+            return GetItemByID(id, null, null);
         }
 
         public static TModel GetItemByID(int id, Func<SPListItem, TModel> mapperDelegate)
+        {
+            return GetItemByID(id, mapperDelegate, null);
+        }
+
+        public static TModel GetItemByID(int id, Func<SPListItem, TModel> mapperDelegate, Action<SPWeb, SPList> afterReadDelegate)
         {
             TModel theItem = new TModel();
 
@@ -248,6 +267,7 @@ namespace GenericDataObject
                                             theItem = mapperDelegate(item);
                                         }
                                     }
+                                    if (afterReadDelegate != null) { afterReadDelegate(web, list); }
                                 }
                             }
                         };
@@ -276,10 +296,15 @@ namespace GenericDataObject
 
         public static TModel GetItemByTitle(string title)
         {
-            return GetItemByTitle(title, null);
+            return GetItemByTitle(title, null, null);
         }
 
         public static TModel GetItemByTitle(string title, Func<SPListItem, TModel> mapperDelegate)
+        {
+            return GetItemByTitle(title, mapperDelegate, null);
+        }
+            
+        public static TModel GetItemByTitle(string title, Func<SPListItem, TModel> mapperDelegate, Action<SPWeb, SPList> afterReadDelegate)
         {
             TModel theItem = new TModel();
 
@@ -358,6 +383,7 @@ namespace GenericDataObject
                                             theItem = mapperDelegate(item);
                                         }
                                     }
+                                    if (afterReadDelegate != null) { afterReadDelegate(web, list); }
                                 }
                             }
                         };
@@ -379,7 +405,119 @@ namespace GenericDataObject
             }
             catch (Exception ex)
             {
-                throw new Exception("Generic SP Data Object GetItemByID Method: " + ex.InnerException + ex.Message + "\n" + ex.StackTrace);
+                throw new Exception("Generic SP Data Object GetItemByTitle Method: " + ex.InnerException + ex.Message + "\n" + ex.StackTrace);
+            }
+
+            return theItem;
+        }
+        
+        public static TModel GetItemByProperty<TProperty, TValue>(Expression<Func<TModel, TProperty>> property, TValue value, Action<SPWeb, SPList> afterRead)
+        {
+            TModel theItem = new TModel();
+            string propertyName = string.empty;
+            
+            try
+            {
+                var member = property.Body as MemberExpression;
+                if (member != null)
+                {
+                    propertyName = member.Member.Name;
+                }
+                else
+                {
+                    throw new ArgumentException("Member does not exist");
+                }
+                
+                hasConnectionString();
+                hasSpList();
+                Action secureCode = () =>
+                    {
+                        using (SPSite site = userToken == null ? new SPSite(ConnectionString) : new SPSite(ConnectionString, userToken))
+                        {
+                            using (SPWeb web = site.OpenWeb())
+                            {
+                                System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
+                                SPList list = web.Lists.TryGetList(spList);
+                                if (list == null)
+                                {
+                                    throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
+                                }
+                                SPQuery query = new SPQuery();
+                                query.ViewFields = string.Empty;
+                                objParams.Each(objParam =>
+                                {
+                                    if (objParam.Name.Equals(propertyName))
+                                    {
+                                        query.Query = @"<Where>
+                                            <Eq>
+                                                <FieldRef Name=""" + objParam.GetFieldNameOrDefault() + @""" LookupId=""TRUE""/>
+                                                <Value Type=""Text"">" + value + @"</value>
+                                            </Eq>
+                                        </Where>";//todo: get type of selected property and map to its proper sharepoint content type
+                                    }
+                                    query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
+                                });
+                                SPListItemCollection items = list.GetItems(query);
+                                foreach (SPListItem item in items)
+                                {
+                                    if (mapperDelegate == null)
+                                    {
+                                        objParams.Each(objParam =>
+                                        {
+                                            string fieldName = objParam.GetFieldNameOrDefault();
+
+                                            if (!objParam.IgnoreField())
+                                            {
+                                                if (objParam.PropertyType == typeof(int))
+                                                {
+                                                    int value = Convert.ToInt32(item[fieldName]);
+                                                    objParam.SetValue(theItem, value, null);
+                                                }
+                                                else if (objParam.PropertyType == typeof(decimal))
+                                                {
+                                                    decimal value = Convert.ToDecimal(item[fieldName]);
+                                                    objParam.SetValue(theItem, value, null);
+                                                }
+                                                else if (objParam.PropertyType == typeof(SPUser))
+                                                {
+                                                    SPUser value = Helper.GetSPUser(item, fieldName);
+                                                    objParam.SetValue(theItem, value, null);
+                                                }
+                                                else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                                {
+                                                    var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                                    objParam.SetValue(theItem, value, null);
+                                                }
+                                                else
+                                                {
+                                                    objParam.SetValue(theItem, item[fieldName], null);
+                                                } 
+                                            }
+                                        });
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        theItem = mapperDelegate(item);
+                                        break;
+                                    }
+                                }
+                                if (afterReadDelegate != null) { afterReadDelegate(web, list); }
+                            }
+                        }
+                    };
+                if (userToken == null)
+                {
+                    SPSecurity.RunWithElevatedPrivileges(delegate() { secureCode.Invoke(); });
+                }
+                else
+                {
+                    secureCode.Invoke();
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Generic SP Data Object GetItemByProperty Method: " + ex.InnerException + ex.Message + "\n" + ex.StackTrace);
             }
 
             return theItem;
@@ -387,22 +525,27 @@ namespace GenericDataObject
 
         public static List<TModel> GetAll()
         {
-            return GetAll(null, null);
+            return GetAll(null, null, null);
         }
 
         public static List<TModel> GetAll(Predicate<TModel> predicate)
         {
-            return (from x in GetAll(null, null)
+            return (from x in GetAll(null, null, null)
                     where predicate.Invoke(x)
                     select x).ToList();
         }
 
         public static List<TModel> GetAll(SPQuery query)
         {
-            return GetAll(query, null);
+            return GetAll(query, null, null);
         }
 
         public static List<TModel> GetAll(SPQuery query, Func<SPListItem, TModel> mapperDelegate)
+        {
+            return GetALL(query, mapperDelegate, null);
+        }
+        
+        public static List<TModel> GetAll(SPQuery query, Func<SPListItem, TModel> mapperDelegate, Action<SPWeb, SPList> afterReadDelegate)
         {
             List<TModel> allItems = new List<TModel>();
 
@@ -499,6 +642,7 @@ namespace GenericDataObject
                                         }
                                         allItems.Add(tmpItem);
                                     }
+                                    if (afterReadDelegate != null) { afterReadDelegate(web, list); }
                                 }
                             }
                         };
@@ -528,10 +672,15 @@ namespace GenericDataObject
 
         public static bool Update(TModel itemToUpdate)
         {
-            return Update(itemToUpdate, null);
+            return Update(itemToUpdate, null, null);
         }
 
         public static bool Update(TModel itemToUpdate, Action<TModel, SPListItem> mapperDelegate)
+        {
+            return Update(itemToUpdate, mapperDelegate, null);
+        }
+        
+        public static bool Update(TModel itemToUpdate, Action<TModel, SPListItem> mapperDelegate, Action<SPWeb, SPList> afterUpdateDelegate)
         {
             bool xBool = false;
 
@@ -570,6 +719,7 @@ namespace GenericDataObject
                                 }
                                 item.Update();
                                 xBool = true;
+                                if (afterUpdateDelegate != null) { afterUpdateDelegate(web, list); }
                             }
                         }
                     };
@@ -589,8 +739,13 @@ namespace GenericDataObject
 
             return xBool;
         }
-
+        
         public static bool BatchUpdate(IEnumerable<TModel> newItems, string updateBuilder, ref string errorMessage)
+        {
+            return BatchUpdate(newItems, updateBuilder, null, ref errorMessage);
+        }
+
+        public static bool BatchUpdate(IEnumerable<TModel> newItems, string updateBuilder, Action<SPWeb, SPList> afterUpdateDelegate, ref string errorMessage)
         {
             errorMessage = string.Empty;
             try
@@ -639,6 +794,7 @@ namespace GenericDataObject
                             {
                                 web.ProcessBatchData(updateBuilder);
                             }
+                            if (afterUpdateDelegate != null) { afterUpdateDelegate(web, list); }
                             web.AllowUnsafeUpdates = false;
                         }
                     }
@@ -666,6 +822,11 @@ namespace GenericDataObject
 
         public static bool Delete(TModel itemToDelete)
         {
+            return Delete(itemToDelete, null)    ;
+        }
+        
+        public static bool Delete(TModel itemToDelete, Action<SPWeb, SPList> afterDeleteDelegate)
+        {
             bool xBool = false;
 
             try
@@ -686,6 +847,7 @@ namespace GenericDataObject
                                 }
                                 list.Items.DeleteItemById(Convert.ToInt32(itemToDelete.GetType().GetProperty("ID").GetValue(itemToDelete, null)));
                                 xBool = true;
+                                if (afterDeleteDelegate) { afterDeleteDelegate(web, list); }
                             }
                         }
                     };
