@@ -271,7 +271,17 @@ namespace GenericDataObject
         public static bool IgnoreField(this PropertyInfo propertyInfo)
         {
             IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
-            return ignorePropertyAttribute == null ? false : ignorePropertyAttribute.ignoreProperty;
+            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.ReadWrite ? ignorePropertyAttribute.ignoreProperty : false);
+        }
+        public static bool IgnoreOnRead(this PropertyInfo propertyInfo)
+        {
+            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
+            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.ReadOnly ? ignorePropertyAttribute.ignoreProperty : false);
+        }
+        public static bool IgnoreOnWrite(this PropertyInfo propertyInfo)
+        {
+            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
+            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.WriteOnly ? ignorePropertyAttribute.ignoreProperty : false);
         }
         public static string NullIfEmpty(this string value)
         {
@@ -291,6 +301,26 @@ namespace GenericDataObject
             }
             return stringBuilder.ToString();
         }
+        //based from http://stackoverflow.com/questions/13074202/passing-strongly-typed-property-name-as-argument
+        public static IEnumerable<TSource> FilterBy<TSource, TProperty, TValue>(this IEnumerable<TSource> source, Expression<Func<TSource, TProperty>> property, TValue value){
+            string propName = getMemberInfo(property).Name;
+            return source.Where(src => src.GetType().GetProperty(propName).GetValue(src, null).Equals(value));
+        }
+        private static MemberInfo getMemberInfo<TObject, TProperty>(Expression<Func<TObject, TProperty>> expression)
+        {
+            var member = expression.Body as MemberExpression;
+            if (member != null)
+            {
+                return member.Member;
+            }
+            throw new ArgumentException("Member does not exist.");
+        }
+    }
+    public enum IgnoreAccess
+    {
+        ReadWrite = 0,
+        ReadOnly = 1,
+        WriteOnly = -1
     }
     /// <summary>
     /// a property or field attribute that specifies if the field is to be ignored when retreiving data. best use for computed field
@@ -299,13 +329,21 @@ namespace GenericDataObject
     public class IgnorePropertyAttribute : Attribute
     {
         public bool ignoreProperty { get; set; }
+        public IgnoreAccess ignoreAccess { get; set; }
         public IgnorePropertyAttribute() 
         {
             this.ignoreProperty = true;
+            this.ignoreAccess = IgnoreAccess.ReadWrite;
         }
         public IgnorePropertyAttribute(bool ignoreProperty)
         {
             this.ignoreProperty = ignoreProperty;
+            this.ignoreAccess = IgnoreAccess.ReadWrite;
+        }
+        public IgnorePropertyAttribute(bool ignoreProperty, IgnoreAccess ignoreAccess)
+        {
+            this.ignoreProperty = ignoreProperty;
+            this.ignoreAccess = ignoreAccess;
         }
     }
     /// <summary>
