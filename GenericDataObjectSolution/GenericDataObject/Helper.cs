@@ -291,7 +291,7 @@ namespace GenericDataObject
         {
             StringBuilder stringBuilder = new StringBuilder();
             PropertyInfo[] props = typeof(TSource).GetProperties();
-            foreach (TSource items in items)
+            foreach (TSource item in items)
             {
                 foreach (PropertyInfo prop in props)
                 {
