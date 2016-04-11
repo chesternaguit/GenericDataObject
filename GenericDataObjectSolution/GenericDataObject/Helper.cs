@@ -285,7 +285,7 @@ namespace GenericDataObject
         }
         public static string NullIfEmpty(this string value)
         {
-            return value == string.empty ? null : value;
+            return value == string.Empty ? null : value;
         }
         public static string ToCsvString<TSource>(this IEnumerable<TSource> items)
         {
