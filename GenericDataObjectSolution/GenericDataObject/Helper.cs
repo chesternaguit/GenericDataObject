@@ -316,6 +316,15 @@ namespace GenericDataObject
             throw new ArgumentException("Member does not exist.");
         }
     }
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    public class IsIdentityAttribute : Attribute
+    {
+        public bool isIdentity { get; set; }
+        public IsIdentityAttribute()
+        {
+            isIdentity = true;
+        }
+    }
     public enum IgnoreAccess
     {
         ReadWrite = 0,
