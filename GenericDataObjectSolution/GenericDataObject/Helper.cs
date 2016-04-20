@@ -283,6 +283,11 @@ namespace GenericDataObject
             IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
             return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.WriteOnly ? ignorePropertyAttribute.ignoreProperty : false);
         }
+        public static bool IsIdentity(this PropertyInfo propertyInfo)
+        {
+            IsIdentityAttribute isIdentityAttribute = (IsIdentityAttribute)propertyInfo.GetCustomAttributes(typeof(IsIdentityAttribute), false).FirstOrDefault();
+            return isIdentityAttribute == null ? false : isIdentityAttribute.isIdentity;
+        }
         public static string NullIfEmpty(this string value)
         {
             return value == string.Empty ? null : value;
