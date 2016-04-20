@@ -70,12 +70,12 @@ namespace GenericDataObject
                             int initCtr = 0;
                             objParams.Each(objParam =>
                             {
-                                if (objParam.Name != "ID" && !objParam.IgnoreField())
+                                if (!objParam.IsIdentity() && !objParam.IgnoreField() && !objParam.IgnoreOnWrite())
                                 {
                                     string fieldName = objParam.GetFieldNameOrDefault();
                                     string separator = initCtr == 0 ? string.Empty : ",";
                                     fields += separator + "[" + fieldName + "]";
-                                    values += separator + "@" + fieldName;
+                                    values += separator + "@" + fieldName.Trim();
                                     initCtr = 1;
                                 }
                             });
@@ -95,10 +95,10 @@ namespace GenericDataObject
 
                         objParams.Each(objParam =>
                         {
-                            if (objParam.Name != "ID" && !objParam.IgnoreField())
+                            if (!objParam.IsIdentity() && !objParam.IgnoreField() && !objParam.IgnoreOnWrite())
                             {
                                 string fieldName = objParam.GetFieldNameOrDefault();
-                                xCom.Parameters.AddWithValue("@" + fieldName, objParam.GetValue(newItem, null));
+                                xCom.Parameters.AddWithValue("@" + fieldName.Trim(), objParam.GetValue(newItem, null));
                             }
                         });
 
@@ -149,7 +149,8 @@ namespace GenericDataObject
                         using (SqlCommand xCom = new SqlCommand())
                         {
                             xCom.Connection = xCon;
-                            xCom.CommandText = string.Format("Select * From {0} Where ID={1}", sqlTable, id);
+                            string identityName = theItem.GetIdentityName() ?? "ID";
+                            xCom.CommandText = string.Format("Select * From {0} Where [{1}]={2}", sqlTable, identityName, id);
                             xCom.CommandType = System.Data.CommandType.Text;
                             SqlDataReader xReader = null;
                             try
@@ -273,7 +274,7 @@ namespace GenericDataObject
                                     {
                                         string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        if (!objParam.IgnoreField())
+                                        if (!objParam.IgnoreField() && !objParam.IgnoreOnRead()))
                                         {
                                             #region value = Convert.ToType(xReader[fieldName]);
 
@@ -380,18 +381,18 @@ namespace GenericDataObject
                             int initCtr = 0;
                             objParams.Each(objParam =>
                             {
-                                if (objParam.Name != "ID" && !objParam.IgnoreField())
+                                if (!objParam.IsIdentity() && !objParam.IgnoreField() && !objParam.IgnoreOnWrite())
                                 {
-                                    string fieldName = objParam.GetFieldNameOrDefault();
                                     string separator = initCtr == 0 ? string.Empty : ",";
-
-                                    setValues += separator + string.Format("[{0}] = @{0}", fieldName);
-
+                                    setValues += separator + string.Format("[{0}] = @{1}", fieldName, fieldName.Trim());
                                     initCtr++;
                                 }
                                 else
                                 {
-                                    condition = " Where ID=" + objParam.GetValue(itemToUpdate, null);
+                                    if (objParam.IsIdentity())
+                                    {
+                                        condition = string.Format(" Where [{0}] = @{1}", fieldName, fieldName.Trim()); 
+                                    }
                                 }
                             });
                             query = query + setValues + condition;
@@ -417,9 +418,9 @@ namespace GenericDataObject
                         {
                             objParams.Each(objParam =>
                             {
-                                if (!objParam.IgnoreField())
+                                if (!objParam.IgnoreField() && !objParam.IgnoreOnWrite())
                                 {
-                                    xCom.Parameters.AddWithValue("@" + objParam.GetFieldNameOrDefault(), objParam.GetValue(itemToUpdate, null)); 
+                                    xCom.Parameters.AddWithValue("@" + objParam.GetFieldNameOrDefault().Trim(), objParam.GetValue(itemToUpdate, null));
                                 }
                             });
                         }
@@ -486,7 +487,8 @@ namespace GenericDataObject
                     using (SqlCommand xCom = new SqlCommand())
                     {
                         xCom.Connection = xCon;
-                        string query = string.Format("Delete From [{0}] Where [ID] = {1}", sqlTable, Convert.ToInt32(itemToDelete.GetType().GetProperty("ID").GetValue(itemToDelete, null)));
+                        string identityName = itemToDelete.GetIdentityName() ?? "ID";
+                        string query = string.Format("Delete From [{0}] Where [{1}] = {2}", sqlTable, identityName, Convert.ToInt32(itemToDelete.GetType().GetProperty("ID").GetValue(itemToDelete, null)));
                         xCom.CommandText = string.IsNullOrEmpty(commandText) ? query : commandText;
                         xCom.CommandType = commandType;
                         if (commandParameters != null)
