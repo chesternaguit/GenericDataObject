@@ -315,6 +315,31 @@ namespace GenericDataObject
             }
             throw new ArgumentException("Member does not exist.");
         }
+                public static string GetTableName<TSource>(this TSource source)
+        {
+            SQLTableNameAttribute tableNameAttribute = (SQLTableNameAttribute)source.GetType().GetCustomAttributes(typeof(SQLTableNameAttribute), false).FirstOrDefault();
+            string tableName = string.Empty;
+            if (tableNameAttribute != null)
+            {
+                tableName = tableNameAttribute.useClassName ? typeof(TSource).Name : (tableNameAttribute.tableName ?? tableName);
+            }
+            return tableName;
+        }
+        public static string GetIdentityName<TSource>(this TSource source)
+        {
+            System.Reflection.PropertyInfo[] objParams = typeof(TSource).GetProperties();
+            string identityName = null;
+            foreach (PropertyInfo propInfo in objParams)
+            {
+                if (propInfo.IsIdentity())
+                {
+                    identityName = propInfo.GetFieldNameOrDefault();
+                    break;
+                }
+            }
+            return identityName;
+        }
+
     }
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class IsIdentityAttribute : Attribute
