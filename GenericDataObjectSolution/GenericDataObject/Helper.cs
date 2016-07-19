@@ -3,19 +3,27 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.SharePoint;
-using System.Reflection;
 using Microsoft.SharePoint.Utilities;
 using System.Net.Mail;
+using System.Reflection;
+using System.Linq.Expressions;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.ComponentModel;
+using System.Web;
 
-namespace GenericDataObject
+namespace MDG.PAF.Core.Common
 {
     public static class Helper
     {
-        
-        //created additional helper to resolve null object returned from querying the splist - february 4, 2015 at 11:24am 
+        #region properties
+
+        public static string DBPafConnection { get { return @"Data Source=MNL07SPDB01\SQLSPDB02;Initial Catalog=DBPAF;Integrated Security=True"; } }
+
+        #endregion
+
+        #region SharePoint Helpers
+
         /// <summary>
         /// returns the SPUser specified by the key within the given ListItem
         /// </summary>
@@ -35,7 +43,6 @@ namespace GenericDataObject
             }
             return null;
         }
-        
         /// <summary>
         /// returns a List of type SPUser
         /// </summary>
@@ -53,7 +60,6 @@ namespace GenericDataObject
             }
             return users;
         }
-
         public static SPGroup GetSPGroup(SPListItem item, string key)
         {
             SPFieldUser field = item.Fields.GetField(key) as SPFieldUser;
@@ -67,12 +73,10 @@ namespace GenericDataObject
             }
             return null;
         }
-
         public static string GetSPUserName(string fieldValue, string urlSite)
         {
             return GetSPUserName(fieldValue, new SPSite(urlSite));
         }
-
         private static string GetSPUserName(string fieldValue, SPSite site)
         {
             string userName = fieldValue;
@@ -89,7 +93,6 @@ namespace GenericDataObject
             }
             return userName;
         }
-
         public static void SendEmail(string siteURL, string emailFrom, string emailTo, string emailSubject, string htmlBody)
         {
             try
@@ -131,44 +134,56 @@ namespace GenericDataObject
                 throw new Exception("Helper: SendEmail:" + ex.Message);
             }
         }
-
-        public static byte[] ImageToByteArray(System.Drawing.Image imageIn)
+        public static SPAuditEntryCollection GetListAuditEntries(string siteUrl, string listName, SPAuditEventType eventType, int userId, DateTime dateFrom, DateTime dateTo, out string errorMessage)
         {
-            using (MemoryStream ms = new MemoryStream())
+            SPAuditEntryCollection _audits;
+            errorMessage = string.Empty;
+            try
             {
-                imageIn.Save(ms, imageIn.RawFormat);
-                string y = Convert.ToBase64String(ms.ToArray());
-                return ms.ToArray();
+                using (SPSite _site = new SPSite(siteUrl))
+                {
+                    using (SPWeb _web = _site.OpenWeb())
+                    {
+                        SPList _list = _web.Lists.TryGetList(listName);
+                        SPAuditQuery _auditQuery = new SPAuditQuery(_site);
+                        _auditQuery.RestrictToList(_list);
+                        _auditQuery.AddEventRestriction(eventType);
+                        _auditQuery.RestrictToUser(userId);
+                        _auditQuery.SetRangeStart(dateFrom);
+                        _auditQuery.SetRangeEnd(dateTo);
+                        SPAudit _audit = _site.Audit;
+                        _audits = _audit.GetEntries(_auditQuery);
+                    }
+                }
+                return _audits;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+                return null;
             }
         }
-
-        public static System.Drawing.Image byteArrayToImage(byte[] byteArrayIn)
+        public static int ClearListAuditEntries(string siteUrl, SPUserToken userToken, DateTime deleteEndDate, out string errorMessage)
         {
-            using (MemoryStream ms = new MemoryStream(byteArrayIn))
+            errorMessage = string.Empty;
+            int _itemsDeleted = 0;
+            try
             {
-                System.Drawing.Image returnImage = System.Drawing.Image.FromStream(ms);
-                return returnImage;
+                using (SPSite _site = new SPSite(siteUrl, userToken))
+                {
+                    using (SPWeb _web = _site.OpenWeb())
+                    {
+                        SPAudit _audit = _site.Audit;
+                        _itemsDeleted = _audit.DeleteEntries(deleteEndDate);
+                    }
+                }
             }
-        }
-
-        public static string GetParameters(MethodBase method, string[] parameters)
-        {
-            StringBuilder parameter = new StringBuilder();
-            ParameterInfo[] errorParameter = method.GetParameters();
-            for (int i = 0; i < errorParameter.Count(); i++)
+            catch (Exception ex)
             {
-                parameter.AppendFormat("{0}={1};", errorParameter[i].Name, parameters[i].ToString());
+                errorMessage = ex.Message;
             }
-            string studentData = parameter.ToString();
-            return studentData;
+            return _itemsDeleted;
         }
-
-        public static T GetEnumValue<T>(SPListItem item, string columnName)
-        {
-            string value = GetSpListItemValue(item, columnName);
-            return (T)Enum.Parse(typeof(T), value);
-        }
-
         public static string GetSpListItemValue(SPListItem item, string columnName)
         {
             string value = string.Empty;
@@ -186,6 +201,27 @@ namespace GenericDataObject
             }
             return value;
         }
+        public static bool CurrentIsMemberOf(SPWeb web, string groupName)
+        {
+            try
+            {
+                return !(string.IsNullOrEmpty(groupName)) ? web.IsCurrentUserMemberOfGroup(web.Groups[groupName].ID) : false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+        public static T GetEnumValue<T>(SPListItem item, string columnName)
+        {
+            string value = GetSpListItemValue(item, columnName);
+            return (T)Enum.Parse(typeof(T), value);
+        }
+
+        #endregion
+
+        #region Extension Methods
+
         /// <summary>
         /// Returns a set of items that are unique by the specified key
         /// </summary>
@@ -251,46 +287,13 @@ namespace GenericDataObject
                 itemAction(item);
             }
         }
-        /// <summary>
-        /// Gets the Field name specified by FieldNameAttribute, if the attribute does not exist returns PropertyInfo.Name as default
-        /// </summary>
-        /// <param name="propertyInfo"></param>
-        /// <returns></returns>
-        public static string GetFieldNameOrDefault(this PropertyInfo propertyInfo)
-        {
-            FieldNameAttribute fieldNameAttribute = (FieldNameAttribute)propertyInfo.GetCustomAttributes(typeof(FieldNameAttribute), false).FirstOrDefault();
-            string fieldName = propertyInfo.Name;
-            if (fieldNameAttribute != null) fieldName = fieldNameAttribute.fieldName ?? fieldName;
-            return fieldName;
-        }
-        /// <summary>
-        /// Checks whether the property has IgnorePropertyAttribute, and return the ignoreProperty value of the attribute. Return false if the attribute is not set
-        /// </summary>
-        /// <param name="propertyInfo"></param>
-        /// <returns></returns>
-        public static bool IgnoreField(this PropertyInfo propertyInfo)
-        {
-            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
-            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.ReadWrite ? ignorePropertyAttribute.ignoreProperty : false);
-        }
-        public static bool IgnoreOnRead(this PropertyInfo propertyInfo)
-        {
-            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
-            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.ReadOnly ? ignorePropertyAttribute.ignoreProperty : false);
-        }
-        public static bool IgnoreOnWrite(this PropertyInfo propertyInfo)
-        {
-            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
-            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.WriteOnly ? ignorePropertyAttribute.ignoreProperty : false);
-        }
-        public static bool IsIdentity(this PropertyInfo propertyInfo)
-        {
-            IsIdentityAttribute isIdentityAttribute = (IsIdentityAttribute)propertyInfo.GetCustomAttributes(typeof(IsIdentityAttribute), false).FirstOrDefault();
-            return isIdentityAttribute == null ? false : isIdentityAttribute.isIdentity;
-        }
         public static string NullIfEmpty(this string value)
         {
             return value == string.Empty ? null : value;
+        }
+        public static string CleanJSON(this string source)
+        {
+            return source.Replace("\"", "&quot;").Replace("\\", "&#92;").Replace("\n", " ").Replace("\r", "");
         }
         public static string ToCsvString<TSource>(this IEnumerable<TSource> items)
         {
@@ -306,8 +309,35 @@ namespace GenericDataObject
             }
             return stringBuilder.ToString();
         }
+        public static string ToHtmlTable<TSource>(this IEnumerable<TSource> items)
+        {
+            System.Xml.Linq.XElement _table = new System.Xml.Linq.XElement("table");
+            PropertyInfo[] props = typeof(TSource).GetProperties();
+
+            System.Xml.Linq.XElement _header = new System.Xml.Linq.XElement("tr");
+            foreach (PropertyInfo prop in props)
+            {
+                System.Xml.Linq.XElement _cell = new System.Xml.Linq.XElement("th", prop.Name);
+                _header.Add(_cell);
+            }
+            _table.Add(_header);
+
+            foreach (TSource item in items)
+            {
+                System.Xml.Linq.XElement _row = new System.Xml.Linq.XElement("tr");
+                foreach (PropertyInfo prop in props)
+                {
+                    System.Xml.Linq.XElement _cell = new System.Xml.Linq.XElement("td", prop.GetValue(item,null));
+                    _row.Add(_cell);
+                }
+                _table.Add(_row);
+            }
+
+            return _table.ToString();
+        }
         //based from http://stackoverflow.com/questions/13074202/passing-strongly-typed-property-name-as-argument
-        public static IEnumerable<TSource> FilterBy<TSource, TProperty, TValue>(this IEnumerable<TSource> source, Expression<Func<TSource, TProperty>> property, TValue value){
+        public static IEnumerable<TSource> FilterBy<TSource, TProperty, TValue>(this IEnumerable<TSource> source, Expression<Func<TSource, TProperty>> property, TValue value)
+        {
             string propName = getMemberInfo(property).Name;
             return source.Where(src => src.GetType().GetProperty(propName).GetValue(src, null).Equals(value));
         }
@@ -320,7 +350,34 @@ namespace GenericDataObject
             }
             throw new ArgumentException("Member does not exist.");
         }
-                public static string GetTableName<TSource>(this TSource source)
+
+        #endregion
+
+        #region Custom Attribute Helpers
+
+        /// <summary>
+        /// Gets the Field name specified by FieldNameAttribute, if the attribute does not exist returns PropertyInfo.Name as default
+        /// </summary>
+        /// <param name="propertyInfo"></param>
+        /// <returns></returns>
+        public static string GetFieldNameOrDefault(this PropertyInfo propertyInfo)
+        {
+            FieldNameAttribute fieldNameAttribute = (FieldNameAttribute)propertyInfo.GetCustomAttributes(typeof(FieldNameAttribute), false).FirstOrDefault();
+            string fieldName = propertyInfo.Name;
+            if (fieldNameAttribute != null) fieldName = fieldNameAttribute.fieldName ?? fieldName;
+            return fieldName;
+        }
+        public static string GetSPListName(MemberInfo member)
+        {
+            SPListNameAttribute listNameAttribute = (SPListNameAttribute)member.GetCustomAttributes(typeof(SPListNameAttribute), false).FirstOrDefault();
+            string listName = string.Empty;
+            if (listNameAttribute != null)
+            {
+                listName = listNameAttribute.useClassName ? member.Name : (listNameAttribute.listName ?? listName);
+            }
+            return listName;
+        }
+        public static string GetTableName<TSource>(this TSource source)
         {
             SQLTableNameAttribute tableNameAttribute = (SQLTableNameAttribute)source.GetType().GetCustomAttributes(typeof(SQLTableNameAttribute), false).FirstOrDefault();
             string tableName = string.Empty;
@@ -344,8 +401,156 @@ namespace GenericDataObject
             }
             return identityName;
         }
+        public static bool IgnoreField(this PropertyInfo propertyInfo)
+        {
+            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
+            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.ReadWrite ? ignorePropertyAttribute.ignoreProperty : false);
+        }
+        public static bool IgnoreOnRead(this PropertyInfo propertyInfo)
+        {
+            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
+            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.OnRead ? ignorePropertyAttribute.ignoreProperty : false);
+        }
+        public static bool IgnoreOnWrite(this PropertyInfo propertyInfo)
+        {
+            IgnorePropertyAttribute ignorePropertyAttribute = (IgnorePropertyAttribute)propertyInfo.GetCustomAttributes(typeof(IgnorePropertyAttribute), false).FirstOrDefault();
+            return ignorePropertyAttribute == null ? false : (ignorePropertyAttribute.ignoreAccess == IgnoreAccess.OnWrite ? ignorePropertyAttribute.ignoreProperty : false);
+        }
+        public static bool IsIdentity(this PropertyInfo propertyInfo)
+        {
+            IsIdentityAttribute isIdentityAttribute = (IsIdentityAttribute)propertyInfo.GetCustomAttributes(typeof(IsIdentityAttribute), false).FirstOrDefault();
+            return isIdentityAttribute == null ? false : isIdentityAttribute.isIdentity;
+        }
 
+        #endregion
+
+        #region Others
+
+        public static string GetParameters(MethodBase method, string[] parameters)
+        {
+            StringBuilder parameter = new StringBuilder();
+            ParameterInfo[] errorParameter = method.GetParameters();
+            for (int i = 0; i < errorParameter.Count(); i++)
+            {
+                parameter.AppendFormat("{0}={1};", errorParameter[i].Name, parameters[i].ToString());
+            }
+            string studentData = parameter.ToString();
+            return studentData;
+        }
+        public static DateTime TimeToFullDate(string timePart, string datePart, int timeZone)
+        {
+            string _dugtong = datePart + " " + timePart + ":00";
+            return Convert.ToDateTime(_dugtong.Trim()).AddHours(timeZone);
+        }
+        public static DateTime IncrementDayIfTimeToIsLess(string timeFrom, string timeTo, string datePart, int timeZone)
+        {
+            string _strDateFrom = datePart + " " + timeFrom + ":00";
+            string _strDateTo = datePart + " " + timeTo + ":00";
+            DateTime _dateFrom = Convert.ToDateTime(_strDateFrom.Trim());
+            DateTime _dateTo = Convert.ToDateTime(_strDateTo.Trim());
+            if (_dateTo < _dateFrom)
+            {
+                _dateTo = _dateTo.AddDays(1);
+            }
+            return _dateTo.AddHours(timeZone);
+        }
+        public static void ExportToPDF(string htmlContent, string fileName)
+        {
+            try
+            {
+                using (iTextSharp.text.Document document = new iTextSharp.text.Document(new iTextSharp.text.Rectangle(792f, 612f)))
+                {
+                    using (iTextSharp.text.html.simpleparser.HTMLWorker htmlWorker = new iTextSharp.text.html.simpleparser.HTMLWorker(document))
+                    {
+                        iTextSharp.text.pdf.PdfWriter.GetInstance(document, HttpContext.Current.Response.OutputStream);
+                        document.Open();
+                        htmlWorker.Parse(new System.IO.StringReader(htmlContent));
+                        document.Close();
+                        HttpContext.Current.Response.ContentType = "application/pdf";
+                        HttpContext.Current.Response.AddHeader("content-disposition", string.Format("attachment; filename={0}.pdf", fileName));
+                        HttpContext.Current.Response.Cache.SetCacheability(HttpCacheability.NoCache);
+                        HttpContext.Current.Response.Write(document);
+                        HttpContext.Current.Response.Flush();
+                        HttpContext.Current.Response.End();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+        public static void ExportToXLSX(string htmlTable, string sheetName, string fileName)
+        {
+            try
+            {
+                using (System.IO.MemoryStream memoryStream = new System.IO.MemoryStream())
+                {
+                    using (DocumentFormat.OpenXml.Packaging.SpreadsheetDocument excelDocument = DocumentFormat.OpenXml.Packaging.SpreadsheetDocument.Create(memoryStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+                    {
+                        DocumentFormat.OpenXml.Packaging.WorkbookPart workbookPart = excelDocument.AddWorkbookPart();
+                        workbookPart.Workbook = new DocumentFormat.OpenXml.Spreadsheet.Workbook();
+                        DocumentFormat.OpenXml.Packaging.WorksheetPart worksheetPart = workbookPart.AddNewPart<DocumentFormat.OpenXml.Packaging.WorksheetPart>();
+                        worksheetPart.Worksheet = new DocumentFormat.OpenXml.Spreadsheet.Worksheet();
+                        DocumentFormat.OpenXml.Spreadsheet.Sheets sheets = excelDocument.WorkbookPart.Workbook.AppendChild(new DocumentFormat.OpenXml.Spreadsheet.Sheets());
+                        DocumentFormat.OpenXml.Spreadsheet.Sheet sheet = new DocumentFormat.OpenXml.Spreadsheet.Sheet() { Id = excelDocument.WorkbookPart.GetIdOfPart(worksheetPart), SheetId = 1, Name = sheetName ?? "sheet1" };
+                        sheets.Append(sheet);
+
+                        #region Populate SheetData object
+
+                        DocumentFormat.OpenXml.Spreadsheet.SheetData sheetData = worksheetPart.Worksheet.AppendChild(new DocumentFormat.OpenXml.Spreadsheet.SheetData());
+                        htmlTable = System.Text.RegularExpressions.Regex.Replace(htmlTable, "\\sdata-bind\\s*=\\s*['|\"].*?['|\"]", string.Empty);
+                        string formattedText = System.Text.RegularExpressions.Regex.Replace(htmlTable, "(?<attribute>\\w+)\\s*=\\s*(?<value>[^'|^\"][\\w*-]*)", "${attribute}=\"${value}\"");
+                        System.Xml.Linq.XDocument doc = System.Xml.Linq.XDocument.Parse(formattedText);
+                        string ns = doc.Root.GetDefaultNamespace().NamespaceName;
+                        foreach (var rowElement in doc.Root.Descendants().Where(xmld => xmld.Name.LocalName.ToLower() == "tr"))//rows
+                        {
+                            DocumentFormat.OpenXml.Spreadsheet.Row currentRow = sheetData.AppendChild(new DocumentFormat.OpenXml.Spreadsheet.Row());
+                            foreach (var cellElement in rowElement.Elements())//cells
+                            {
+                                DocumentFormat.OpenXml.Spreadsheet.Cell currentCell = currentRow.AppendChild(new DocumentFormat.OpenXml.Spreadsheet.Cell());
+                                if (cellElement.HasElements)
+                                {
+                                    DocumentFormat.OpenXml.Spreadsheet.CellValue cellValue = currentCell.AppendChild(new DocumentFormat.OpenXml.Spreadsheet.CellValue(cellElement.Elements().First().Value));
+                                }
+                                else
+                                {
+                                    DocumentFormat.OpenXml.Spreadsheet.CellValue cellValue = currentCell.AppendChild(new DocumentFormat.OpenXml.Spreadsheet.CellValue(cellElement.Value));
+                                }
+
+                                currentCell.DataType = new DocumentFormat.OpenXml.EnumValue<DocumentFormat.OpenXml.Spreadsheet.CellValues>(DocumentFormat.OpenXml.Spreadsheet.CellValues.String);
+                            }
+                        }
+
+                        #endregion
+
+                        workbookPart.Workbook.Save();
+
+                        #region Send Excel File to User for Download via httpcontext response
+
+                        HttpContext.Current.Response.Clear();
+                        HttpContext.Current.Response.AddHeader("Content-disposition", string.Format("attachment; filename={0}.xlsx", fileName));
+                        HttpContext.Current.Response.ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                        HttpContext.Current.Response.AddHeader("Content-Length", memoryStream.Length.ToString());
+                        HttpContext.Current.Response.Cache.SetCacheability(HttpCacheability.NoCache);
+                        HttpContext.Current.Response.BinaryWrite(memoryStream.ToArray());
+                        HttpContext.Current.Response.End();
+
+                        #endregion
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        #endregion
     }
+
+    #region Custom Attributes
+
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class IsIdentityAttribute : Attribute
     {
@@ -358,8 +563,8 @@ namespace GenericDataObject
     public enum IgnoreAccess
     {
         ReadWrite = 0,
-        ReadOnly = 1,
-        WriteOnly = -1
+        OnRead = 1,
+        OnWrite = -1
     }
     /// <summary>
     /// a property or field attribute that specifies if the field is to be ignored when retreiving data. best use for computed field
@@ -369,7 +574,7 @@ namespace GenericDataObject
     {
         public bool ignoreProperty { get; set; }
         public IgnoreAccess ignoreAccess { get; set; }
-        public IgnorePropertyAttribute() 
+        public IgnorePropertyAttribute()
         {
             this.ignoreProperty = true;
             this.ignoreAccess = IgnoreAccess.ReadWrite;
@@ -444,7 +649,9 @@ namespace GenericDataObject
             this.useClassName = useClassName;
         }
     }
-    
+
+    #endregion
+
     //credits to Matthew Yarlett
     //https://social.msdn.microsoft.com/Forums/office/en-US/92c1a750-0624-4887-b0f0-1c61234ab6b3/saving-file-to-another-server-using-c?forum=sharepointdevelopmentprevious#11691439-640e-49a7-a185-3a87328910d0
     public class Impersonator : IDisposable
@@ -518,6 +725,53 @@ namespace GenericDataObject
             {
                 _impersonationContext.Undo();
             }
+        }
+    }
+
+    public class FunctionalComparer<T> : IComparer<T>
+    {
+        private Func<T, T, int> comparer;
+        public FunctionalComparer(Func<T, T, int> comparer)
+        {
+            this.comparer = comparer;
+        }
+        public static IComparer<T> Create(Func<T, T, int> comparer)
+        {
+            return new FunctionalComparer<T>(comparer);
+        }
+        public int Compare(T x, T y)
+        {
+            return comparer(x, y);
+        }
+    }
+
+    //Tuple polyfill for .Net 3.5 http://stackoverflow.com/a/956043
+    public struct Tuple<T1, T2> : IEquatable<Tuple<T1, T2>>
+    {
+        readonly T1 first;
+        readonly T2 second;
+        public Tuple(T1 first, T2 second)
+        {
+            this.first = first;
+            this.second = second;
+        }
+        public T1 First { get { return first; } }
+        public T2 Second { get { return second; } }
+        public override int GetHashCode()
+        {
+            return first.GetHashCode() ^ second.GetHashCode();
+        }
+        public override bool Equals(object obj)
+        {
+            if (obj == null || GetType() != obj.GetType())
+            {
+                return false;
+            }
+            return Equals((Tuple<T1, T2>)obj);
+        }
+        public bool Equals(Tuple<T1, T2> other)
+        {
+            return other.first.Equals(first) && other.second.Equals(second);
         }
     }
 
