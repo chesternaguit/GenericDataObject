@@ -195,101 +195,80 @@ namespace GenericDataObject
 
             try
             {
-                if (!isCached())
-                {
-                    #region Try to get the item from SharePoint
+                #region Try to get the item from SharePoint
 
-                    hasConnectionString();
-                    hasSpList();
-                    Action secureCode = () =>
+                hasConnectionString();
+                hasSpList();
+                Action secureCode = () =>
+                    {
+                        using (SPSite site = userToken == null ? new SPSite(SiteUrl) : new SPSite(SiteUrl, userToken))
                         {
-                            using (SPSite site = userToken == null ? new SPSite(ConnectionString) : new SPSite(ConnectionString, userToken))
+                            using (SPWeb web = site.OpenWeb())
                             {
-                                using (SPWeb web = site.OpenWeb())
+                                System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
+                                SPList list = web.Lists.TryGetList(ListName);
+                                if (list == null)
                                 {
-                                    System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
-                                    SPList list = web.Lists.TryGetList(spList);
-                                    if (list == null)
-                                    {
-                                        throw new Exception(string.Format("there was no list named \"{0}\" in {1}", spList, ConnectionString));
-                                    }
-                                    SPQuery query = new SPQuery();
-                                    query.Query = @"<Where>
-                                        <Eq>
-                                            <FieldRef Name=""ID"" LookupId=""TRUE""/>
-                                            <Value Type=""Integer"">" + id + @"</value>
-                                        </Eq>
-                                    </Where>";
-                                    query.ViewFields = string.Empty;
+                                    throw new Exception(string.Format("there was no list named \"{0}\" in {1}", ListName, SiteUrl));
+                                }
+
+                                SPListItem item = list.GetItemById(id);
+                                if (mapperDelegate == null)
+                                {
                                     objParams.Each(objParam =>
                                     {
-                                        query.ViewFields += string.Format(@"<FieldRef Name=""{0}""/>", objParam.GetFieldNameOrDefault());
-                                    });
-                                    SPListItemCollection items = list.GetItems(query);
-                                    foreach (SPListItem item in items)
-                                    {
-                                        if (mapperDelegate == null)
-                                        {
-                                            objParams.Each(objParam =>
-                                            {
-                                                string fieldName = objParam.GetFieldNameOrDefault();
+                                        string fieldName = objParam.GetFieldNameOrDefault();
 
-                                                if (!objParam.IgnoreField())
-                                                {
-                                                    if (objParam.PropertyType == typeof(int))
-                                                    {
-                                                        int value = Convert.ToInt32(item[fieldName]);
-                                                        objParam.SetValue(theItem, value, null);
-                                                    }
-                                                    else if (objParam.PropertyType == typeof(decimal))
-                                                    {
-                                                        decimal value = Convert.ToDecimal(item[fieldName]);
-                                                        objParam.SetValue(theItem, value, null);
-                                                    }
-                                                    else if (objParam.PropertyType == typeof(SPUser))
-                                                    {
-                                                        SPUser value = Helper.GetSPUser(item, fieldName);
-                                                        objParam.SetValue(theItem, value, null);
-                                                    }
-                                                    else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                                    {
-                                                        var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
-                                                        objParam.SetValue(theItem, value, null);
-                                                    }
-                                                    else
-                                                    {
-                                                        objParam.SetValue(theItem, item[fieldName], null);
-                                                    } 
-                                                }
-                                            });
-                                        }
-                                        else
+                                        if (!objParam.IgnoreField())
                                         {
-                                            theItem = mapperDelegate(item);
+                                            if (objParam.PropertyType == typeof(int))
+                                            {
+                                                int value = Convert.ToInt32(item[fieldName]);
+                                                objParam.SetValue(theItem, value, null);
+                                            }
+                                            else if (objParam.PropertyType == typeof(decimal))
+                                            {
+                                                decimal value = Convert.ToDecimal(item[fieldName]);
+                                                objParam.SetValue(theItem, value, null);
+                                            }
+                                            else if (objParam.PropertyType == typeof(SPUser))
+                                            {
+                                                SPUser value = Helper.GetSPUser(item, fieldName);
+                                                objParam.SetValue(theItem, value, null);
+                                            }
+                                            else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                            {
+                                                var value = Enum.Parse(objParam.PropertyType, item[fieldName].ToString());
+                                                objParam.SetValue(theItem, value, null);
+                                            }
+                                            else
+                                            {
+                                                objParam.SetValue(theItem, item[fieldName], null);
+                                            }
                                         }
-                                    }
-                                    if (afterReadDelegate != null) { afterReadDelegate(web, list); }
+                                    });
                                 }
+                                else
+                                {
+                                    theItem = mapperDelegate(item);
+                                }
+                                if (afterReadDelegate != null) { afterReadDelegate(web, list); }
                             }
-                        };
-                    if (userToken == null)
-                    {
-                        SPSecurity.RunWithElevatedPrivileges(delegate() { secureCode.Invoke(); });
-                    }
-                    else
-                    {
-                        secureCode.Invoke();
-                    }
-                    #endregion
+                        }
+                    };
+                if (userToken == null)
+                {
+                    SPSecurity.RunWithElevatedPrivileges(delegate() { secureCode.Invoke(); });
                 }
                 else
                 {
-                    theItem = cachedItems.Where(ci => Convert.ToInt32(ci.GetType().GetProperty("ID").GetValue(ci, null)) == id).FirstOrDefault();
+                    secureCode.Invoke();
                 }
+                #endregion
             }
             catch (Exception ex)
             {
-                throw new Exception("Generic SP Data Object GetItemByID Method: " + ex.InnerException + ex.Message + "\n" + ex.StackTrace);
+                throw ex;
             }
 
             return theItem;
