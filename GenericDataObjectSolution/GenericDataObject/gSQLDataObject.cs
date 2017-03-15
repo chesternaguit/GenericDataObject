@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +6,7 @@ using System.Data.SqlClient;
 
 namespace GenericDataObject
 {
-    public class gSQLDataObject<TBusinessObject> where TBusinessObject : new()
+    public class gSQLDataObject<TModel> where TModel : new()
     {
 
         #region Properties
@@ -19,7 +19,7 @@ namespace GenericDataObject
         public static string updateQuery = string.Empty;
         public static string deleteQuery = string.Empty;
         //cache variables
-        private static List<TBusinessObject> cachedItems = null;
+        private static List<TModel> cachedItems = null;
         private static DateTime? timeRefresh = (DateTime?)null;
         public static int refreshInterval = 0;
 
@@ -27,77 +27,88 @@ namespace GenericDataObject
 
         #region Create
 
-        public static bool Create(TBusinessObject newItem)
+        public bool Create(TModel newItem)
         {
-            return Create(newItem, System.Data.CommandType.Text, string.Empty);
+            object tmp = null;
+            return Create(newItem, System.Data.CommandType.Text, string.Empty, out tmp);
         }
 
-        public static bool Create(TBusinessObject newItem, System.Data.CommandType commandType, string commandText)
+        public bool Create(TModel newItem, System.Data.CommandType commandType, string commandText)
         {
             object tmp = null;
             return Create(newItem, commandType, commandText, out tmp);
         }
 
-        public static bool Create(TBusinessObject newItem, out object identity)
+        public bool Create(TModel newItem, out object identity)
         {
             identity = null;
             return Create(newItem, System.Data.CommandType.Text, string.Empty, out identity);
         }
 
-        public static bool Create(TBusinessObject newItem, System.Data.CommandType commandType, string commandText, out object identity)
+        public bool Create(TModel newItem, System.Data.CommandType commandType, string commandText, out object identity)
         {
             bool xBool = false;
 
             try
             {
-                System.Reflection.PropertyInfo[] objParams = typeof(TBusinessObject).GetProperties();
+                System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
                 hasConnectionString();
                 hasSqlTable();
-                using (SqlConnection xCon = new SqlConnection(connectionString))
+                using (SqlConnection xCon = new SqlConnection(_connectionString))
                 {
                     using (SqlCommand xCom = new SqlCommand())
                     {
                         xCom.Connection = xCon;
-                        string query = string.Empty;
+                        StringBuilder query = new StringBuilder();
                         #region query = "Insert Into sqlTable ([Name], ...) Values(@Value, ...)"
 
                         if (string.IsNullOrEmpty(commandText))
                         {
-                            query = string.Format("Insert Into [{0}] ", sqlTable);
-                            string fields = "(";
-                            string values = "Values(";
+                            query.AppendFormat("Insert Into {0} ", _SQLTable);
+                            StringBuilder fields = new StringBuilder("(");
+                            StringBuilder values = new StringBuilder("Values(");
                             int initCtr = 0;
-                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                            objParams.Each(objParam =>
                             {
-                                if (objParam.Name != "ID")
+                                if (!objParam.IsIdentity() && !objParam.IgnoreField() && !objParam.IgnoreOnWrite())
                                 {
+                                    string fieldName = objParam.GetFieldNameOrDefault();
                                     string separator = initCtr == 0 ? string.Empty : ",";
-                                    fields += separator + "[" + objParam.Name + "]";
-                                    values += separator + "@" + objParam.Name;
+                                    fields.AppendFormat("{0}[{1}]", separator, fieldName);
+                                    values.AppendFormat("{0}@{1}", separator, fieldName.Trim());
                                     initCtr = 1;
                                 }
-                            }
-                            fields += ") ";
-                            values += ")";
-                            query += fields + values;
+                            });
+                            fields.Append(") ");
+                            values.Append(")");
+                            query.Append(fields.ToString());
+                            query.Append(values.ToString());
                         }
                         else
                         {
-                            query = commandText;
+                            query.Append(commandText);
                         }
 
                         #endregion
-                        xCom.CommandText = query;
+                        xCom.CommandText = query.ToString();
                         xCom.CommandType = commandType;
                         #region xCom.Parameters.AddWithValue("@Name",Value) ...
 
-                        foreach (System.Reflection.PropertyInfo objParam in objParams)
+                        objParams.Each(objParam =>
                         {
-                            if (objParam.Name != "ID")
+                            if (!objParam.IsIdentity() && !objParam.IgnoreField() && !objParam.IgnoreOnWrite())
                             {
-                                xCom.Parameters.AddWithValue("@" + objParam.Name, objParam.GetValue(newItem, null));
+                                string fieldName = objParam.GetFieldNameOrDefault();
+                                if (objParam.PropertyType == typeof(bool))
+                                {
+                                    xCom.Parameters.Add(new SqlParameter() { ParameterName = "@" + fieldName.Trim(), Value = objParam.GetValue(newItem, null), DbType = System.Data.DbType.Boolean });
+                                }
+                                else
+                                {
+                                    xCom.Parameters.Add(new SqlParameter("@" + fieldName.Trim(), objParam.GetValue(newItem, null) ?? DBNull.Value));
+                                }
                             }
-                        }
+                        });
 
                         #endregion
                         try
@@ -108,7 +119,7 @@ namespace GenericDataObject
                         }
                         catch (SqlException ex)
                         {
-                            throw new Exception("Generic SQL Data Object Create Method: " + ex.Message + "\n" + ex.StackTrace);
+                            throw new Exception("Generic SQL Data Object Create Method: " + ex.Message);
                         }
                         finally
                         {
@@ -119,7 +130,61 @@ namespace GenericDataObject
             }
             catch (Exception ex)
             {
-                throw new Exception("Generic SQL Data Object Create Method: " + ex.Message + "\n" + ex.StackTrace);
+                throw new Exception("Generic SQL Data Object Create Method: " + ex.Message);
+            }
+
+            return xBool;
+        }
+
+        public bool BatchCreate(List<TModel> items)
+        {
+            bool xBool = false;
+
+            try
+            {
+                System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
+                hasConnectionString();
+                hasSqlTable();
+                using (SqlConnection xCon = new SqlConnection(_connectionString))
+                {
+                    xCon.Open();
+                    using (SqlBulkCopy bulkCopy = new SqlBulkCopy(xCon))
+                    {
+                        try
+                        {
+                            bulkCopy.DestinationTableName = (new TModel()).GetTableName();
+                            DataTable dataTable = new DataTable();
+                            objParams.Each(field =>
+                            {
+                                dataTable.Columns.Add(field.GetFieldNameOrDefault());
+                            });
+                            items.Each(item =>
+                            {
+                                DataRow row = dataTable.NewRow();
+                                objParams.Each(field =>
+                                {
+                                    row[field.GetFieldNameOrDefault()] = field.GetValue(item, null);
+                                });
+                                dataTable.Rows.Add(row);
+                            });
+                            dataTable.AcceptChanges();
+                            bulkCopy.WriteToServer(dataTable.Rows.Cast<DataRow>().ToArray());
+                            xBool = true;
+                        }
+                        catch (SqlException ex)
+                        {
+                            throw new Exception("Generic SQL Data Object Create Method: " + ex.Message);
+                        }
+                        finally
+                        {
+                            xCon.Close();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Generic SQL Data Object Create Method: " + ex.Message);
             }
 
             return xBool;
@@ -129,24 +194,25 @@ namespace GenericDataObject
 
         #region Read
 
-        public static TBusinessObject GetItemByID(int id)
+        public TModel GetItemByID(int id)
         {
-            TBusinessObject theItem = new TBusinessObject();
+            TModel theItem = new TModel();
             try
             {
                 if (!isCached())
                 {
                     #region Try to get the item from the server
 
-                    var objParams = typeof(TBusinessObject).GetProperties();
+                    var objParams = typeof(TModel).GetProperties();
                     hasConnectionString();
                     hasSqlTable();
-                    using (SqlConnection xCon = new SqlConnection(connectionString))
+                    using (SqlConnection xCon = new SqlConnection(_connectionString))
                     {
                         using (SqlCommand xCom = new SqlCommand())
                         {
                             xCom.Connection = xCon;
-                            xCom.CommandText = string.Format("Select * From {0} Where ID={1}", sqlTable, id);
+                            string identityName = theItem.GetIdentityName() ?? "ID";
+                            xCom.CommandText = string.Format("Select * From {0} Where [{1}]={2}", _SQLTable, identityName, id);
                             xCom.CommandType = System.Data.CommandType.Text;
                             SqlDataReader xReader = null;
                             try
@@ -158,27 +224,54 @@ namespace GenericDataObject
                                     foreach (var objParam in objParams)
                                     {
                                         Object value = null;
+                                        string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        #region value = Convert.ToType(xReader[objParam.Name]);
+                                        if (!objParam.IgnoreField() && !objParam.IgnoreOnRead())
+                                        {
+                                            #region value = Convert.ToType(xReader[fieldName]);
 
-                                        if (objParam.PropertyType == typeof(int))
-                                        {
-                                            value = Convert.ToInt32(xReader[objParam.Name]);
-                                        }
-                                        else if (objParam.PropertyType == typeof(decimal))
-                                        {
-                                            value = Convert.ToDecimal(xReader[objParam.Name]);
-                                        }
-                                        else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                        {
-                                            value = Enum.Parse(objParam.PropertyType, xReader[objParam.Name].ToString());
-                                        }
-                                        else
-                                        {
-                                            value = xReader[objParam.Name];
-                                        }
+                                            if (objParam.PropertyType == typeof(int))
+                                            {
+                                                value = Convert.ToInt32(xReader[fieldName]);
+                                            }
+                                            else if (objParam.PropertyType == typeof(decimal))
+                                            {
+                                                value = Convert.ToDecimal(xReader[fieldName]);
+                                            }
+                                            else if (objParam.PropertyType == typeof(Single))
+                                            {
+                                                value = Convert.ToSingle(xReader[fieldName]);
+                                            }
+                                            else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                            {
+                                                value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
+                                            }
+                                            else if (objParam.PropertyType == typeof(string))
+                                            {
+                                                value = xReader[fieldName].ToString();
+                                            }
+                                            else if (objParam.PropertyType == typeof(bool))
+                                            {
+                                                value = xReader[fieldName] == DBNull.Value ? false : Convert.ToBoolean(xReader[fieldName]);
+                                            }
+                                            else if (objParam.PropertyType == typeof(DateTime))
+                                            {
+                                                value = Convert.ToDateTime(xReader[fieldName]);
+                                            }
+                                            else if (objParam.PropertyType == typeof(DateTime?))
+                                            {
+                                                if (xReader[fieldName] != DBNull.Value)
+                                                {
+                                                    value = Convert.ToDateTime(xReader[fieldName]);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                value = xReader[fieldName];
+                                            }
 
-                                        #endregion
+                                            #endregion
+                                        }
 
                                         objParam.SetValue(theItem, value, null);
                                     }
@@ -187,7 +280,7 @@ namespace GenericDataObject
                             }
                             catch (SqlException ex)
                             {
-                                throw new Exception("Generic SQL Data Object GetItemByID Method: " + ex.Message + "\n" + ex.StackTrace);
+                                throw new Exception("Generic SQL Data Object GetItemByID Method: " + ex.Message);
                             }
                             finally
                             {
@@ -205,27 +298,31 @@ namespace GenericDataObject
             }
             catch (Exception ex)
             {
-                throw new Exception("Generic SQL Data Object GetItemByID Method: " + ex.InnerException + ex.Message + "\n" + ex.StackTrace);
+                throw new Exception("Generic SQL Data Object GetItemByID Method: " + ex.Message);
             }
 
             return theItem;
         }
 
-        public static List<TBusinessObject> GetAll()
+        public List<TModel> GetAll()
         {
-            return GetAll(System.Data.CommandType.Text, "", null);
+            return GetAll(System.Data.CommandType.Text, null, null, null);
         }
 
-        public static List<TBusinessObject> GetAll(Predicate<TBusinessObject> predicate)
+        public List<TModel> GetAll(Predicate<TModel> predicate)
         {
-            return (from x in GetAll(System.Data.CommandType.Text, "", null)
+            return (from x in GetAll(System.Data.CommandType.Text, null, null, null)
                     where predicate.Invoke(x)
                     select x).ToList();
         }
 
-        public static List<TBusinessObject> GetAll(System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public List<TModel> GetAll(System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters)
         {
-            List<TBusinessObject> allItems = new List<TBusinessObject>();
+            return GetAll(commandType, commandText, commandParameters, null);
+        }
+        public List<TModel> GetAll(System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters, Func<SqlDataReader, TModel> mapperDelegate)
+        {
+            List<TModel> allItems = new List<TModel>();
 
             try
             {
@@ -233,15 +330,16 @@ namespace GenericDataObject
                 {
                     #region Try to get the list of data from server
 
-                    System.Reflection.PropertyInfo[] objParams = typeof(TBusinessObject).GetProperties();
+                    System.Reflection.PropertyInfo[] objParams = typeof(TModel).GetProperties();
                     hasConnectionString();
                     hasSqlTable();
-                    using (SqlConnection xCon = new SqlConnection(connectionString))
+                    using (SqlConnection xCon = new SqlConnection(_connectionString))
                     {
                         using (SqlCommand xCom = new SqlCommand())
                         {
                             xCom.Connection = xCon;
-                            xCom.CommandText = string.IsNullOrEmpty(commandText) ? string.Format("Select * From {0}", sqlTable) : commandText;
+                            string selectFields = string.Join(",", objParams.Where(op => !op.IgnoreField() && !op.IgnoreOnRead()).Select(op => "[" + op.GetFieldNameOrDefault() + "]").ToArray());
+                            xCom.CommandText = commandText ?? string.Format("Select {0} From {1}", selectFields, _SQLTable);
                             xCom.CommandType = commandType;
                             if (commandParameters != null)
                             {
@@ -257,33 +355,73 @@ namespace GenericDataObject
                                 xReader = xCom.ExecuteReader();
                                 while (xReader.Read())
                                 {
-                                    TBusinessObject tmpItem = new TBusinessObject();
-                                    foreach (System.Reflection.PropertyInfo objParam in objParams)
+                                    TModel tmpItem = new TModel();
+                                    if (mapperDelegate == null)
                                     {
-                                        Object value = null;
+                                        objParams.Each(objParam =>
+                                                                    {
+                                                                        string fieldName = objParam.GetFieldNameOrDefault();
 
-                                        #region value = Convert.ToType(xReader[objParam.Name]);
+                                                                        if (!objParam.IgnoreField() && !objParam.IgnoreOnRead())
+                                                                        {
+                                                                            #region value = Convert.ToType(xReader[fieldName]);
 
-                                        if (objParam.PropertyType == typeof(int))
-                                        {
-                                            value = Convert.ToInt32(xReader[objParam.Name]);
-                                        }
-                                        else if (objParam.PropertyType == typeof(decimal))
-                                        {
-                                            value = Convert.ToDecimal(xReader[objParam.Name]);
-                                        }
-                                        else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
-                                        {
-                                            value = Enum.Parse(objParam.PropertyType, xReader[objParam.Name].ToString());
-                                        }
-                                        else
-                                        {
-                                            value = xReader[objParam.Name];
-                                        }
+                                                                            if (objParam.PropertyType == typeof(int))
+                                                                            {
+                                                                                int value = Convert.ToInt32(xReader[fieldName]);
+                                                                                objParam.SetValue(tmpItem, value, null);
+                                                                            }
+                                                                            else if (objParam.PropertyType == typeof(decimal))
+                                                                            {
+                                                                                decimal value = Convert.ToDecimal(xReader[fieldName]);
+                                                                                objParam.SetValue(tmpItem, value, null);
+                                                                            }
+                                                                            else if (objParam.PropertyType == typeof(Single))
+                                                                            {
+                                                                                Single value = Convert.ToSingle(xReader[fieldName]);
+                                                                                objParam.SetValue(tmpItem, value, null);
+                                                                            }
+                                                                            else if (objParam.PropertyType.UnderlyingSystemType.IsEnum)
+                                                                            {
+                                                                                var value = Enum.Parse(objParam.PropertyType, xReader[fieldName].ToString());
+                                                                                objParam.SetValue(tmpItem, value, null);
+                                                                            }
+                                                                            else if (objParam.PropertyType == typeof(string))
+                                                                            {
+                                                                                objParam.SetValue(tmpItem, xReader[fieldName].ToString(), null);
+                                                                            }
+                                                                            else if (objParam.PropertyType == typeof(bool))
+                                                                            {
+                                                                                bool bValue = xReader[fieldName] == DBNull.Value ? false : Convert.ToBoolean(xReader[fieldName]);
+                                                                                objParam.SetValue(tmpItem, bValue, null);
+                                                                            }
+                                                                            else if (objParam.PropertyType == typeof(DateTime))
+                                                                            {
+                                                                                DateTime bValue = Convert.ToDateTime(xReader[fieldName]);
+                                                                                objParam.SetValue(tmpItem, bValue, null);
+                                                                            }
+                                                                            else if (objParam.PropertyType == typeof(DateTime?))
+                                                                            {
+                                                                                DateTime? value = null;
+                                                                                if (xReader[fieldName] != DBNull.Value)
+                                                                                {
+                                                                                    value = Convert.ToDateTime(xReader[fieldName]);
+                                                                                }
+                                                                                objParam.SetValue(tmpItem, value, null);
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                objParam.SetValue(tmpItem, xReader[fieldName], null);
+                                                                            }
 
-                                        #endregion
+                                                                            #endregion
+                                                                        }
 
-                                        objParam.SetValue(tmpItem, value, null);
+                                                                    });
+                                    }
+                                    else
+                                    {
+                                        tmpItem = mapperDelegate(xReader);
                                     }
                                     allItems.Add(tmpItem);
                                 }
@@ -291,7 +429,7 @@ namespace GenericDataObject
                             }
                             catch (SqlException ex)
                             {
-                                throw new Exception("Generic SQL Data Object GetAll Method: " + ex.Message + "\n" + ex.StackTrace);
+                                throw new Exception("Generic SQL Data Object GetAll Method: " + ex.Message);
                             }
                             finally
                             {
@@ -306,7 +444,7 @@ namespace GenericDataObject
             }
             catch (Exception ex)
             {
-                throw new Exception("Generic SQL Data Object GetAll Method: " + ex.Message + "\n" + ex.StackTrace);
+                throw new Exception("Generic SQL Data Object GetAll Method: " + ex.Message);
             }
 
             return cachedItems;
@@ -316,24 +454,24 @@ namespace GenericDataObject
 
         #region Update
 
-        public static bool Update(TBusinessObject itemToUpdate)
+        public bool Update(TModel itemToUpdate)
         {
             int tmp = 0;
-            return Update(itemToUpdate, out tmp);
+            return Update(itemToUpdate, System.Data.CommandType.Text, string.Empty, null, out tmp);
         }
 
-        public static bool Update(TBusinessObject itemToUpdate, out int rowsAffected)
+        public bool Update(TModel itemToUpdate, out int rowsAffected)
         {
             return Update(itemToUpdate, System.Data.CommandType.Text, string.Empty, null, out rowsAffected);
         }
 
-        public static bool Update(TBusinessObject itemToUpdate, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public bool Update(TModel itemToUpdate, System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters)
         {
             int tmp = 0;
             return Update(itemToUpdate, commandType, commandText, commandParameters, out tmp);
         }
 
-        public static bool Update(TBusinessObject itemToUpdate, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters, out int rowsAffected)
+        public bool Update(TModel itemToUpdate, System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters, out int rowsAffected)
         {
             bool xBool = false;
             rowsAffected = 0;
@@ -341,47 +479,50 @@ namespace GenericDataObject
             try
             {
                 System.Reflection.PropertyInfo[] objParams = itemToUpdate.GetType().GetProperties();
-                hasID(itemToUpdate);
+                //hasID(itemToUpdate);
                 hasConnectionString();
                 hasSqlTable();
-                using (SqlConnection xCon = new SqlConnection(connectionString))
+                using (SqlConnection xCon = new SqlConnection(_connectionString))
                 {
                     using (SqlCommand xCom = new SqlCommand())
                     {
                         xCom.Connection = xCon;
-                        string query = string.Empty;
+                        StringBuilder query = new StringBuilder();
                         #region query = "Update sqlTable Set [Name] = @Value ... Where ID=@ID"
 
                         if (string.IsNullOrEmpty(commandText))
                         {
-                            query = string.Format("Update [{0}] Set ", sqlTable);
-                            string setValues = string.Empty;
-                            string condition = string.Empty;
+                            query.AppendFormat("Update {0} Set ", _SQLTable);
+                            StringBuilder setValues = new StringBuilder();
+                            StringBuilder condition = new StringBuilder();
                             int initCtr = 0;
-                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                            objParams.Each(objParam =>
                             {
-                                if (objParam.Name != "ID")
+                                string fieldName = objParam.GetFieldNameOrDefault();
+                                if (!objParam.IsIdentity() && !objParam.IgnoreField() && !objParam.IgnoreOnWrite())
                                 {
                                     string separator = initCtr == 0 ? string.Empty : ",";
-
-                                    setValues += separator + string.Format("[{0}] = @{0}", objParam.Name);
-
+                                    setValues.AppendFormat("{0}[{1}] = @{2}", separator, fieldName, fieldName.Trim());
                                     initCtr++;
                                 }
                                 else
                                 {
-                                    condition = " Where ID=" + objParam.GetValue(itemToUpdate, null);
+                                    if (objParam.IsIdentity())
+                                    {
+                                        condition.AppendFormat(" Where [{0}] = @{1}", fieldName, fieldName.Trim());
+                                    }
                                 }
-                            }
-                            query = query + setValues + condition;
+                            });
+                            query.Append(setValues.ToString());
+                            query.Append(condition.ToString());
                         }
                         else
                         {
-                            query = commandText;
+                            query.Append(commandText);
                         }
 
                         #endregion
-                        xCom.CommandText = query;
+                        xCom.CommandText = query.ToString();
                         xCom.CommandType = commandType;
                         #region xCom.Parameters.AddWithValue("@Name",Value)
 
@@ -394,10 +535,21 @@ namespace GenericDataObject
                         }
                         else
                         {
-                            foreach (System.Reflection.PropertyInfo objParam in objParams)
+                            objParams.Each(objParam =>
                             {
-                                xCom.Parameters.AddWithValue("@" + objParam.Name, objParam.GetValue(itemToUpdate, null));
-                            }
+                                if (!objParam.IgnoreField() && !objParam.IgnoreOnWrite())
+                                {
+                                    if (objParam.PropertyType == typeof(bool))
+                                    {
+                                        xCom.Parameters.Add(new SqlParameter() { ParameterName = "@" + objParam.GetFieldNameOrDefault().Trim(), Value = objParam.GetValue(itemToUpdate, null), DbType = System.Data.DbType.Boolean });
+                                    }
+                                    else
+                                    {
+                                        xCom.Parameters.AddWithValue("@" + objParam.GetFieldNameOrDefault().Trim(), objParam.GetValue(itemToUpdate, null));
+                                    }
+
+                                }
+                            });
                         }
 
                         #endregion
@@ -409,7 +561,7 @@ namespace GenericDataObject
                         }
                         catch (SqlException ex)
                         {
-                            throw new Exception("Generic SQL Data Object Update Method: " + ex.Message + "\n" + ex.StackTrace);
+                            throw new Exception("Generic SQL Data Object Update Method: " + ex.Message);
                         }
                         finally
                         {
@@ -420,7 +572,7 @@ namespace GenericDataObject
             }
             catch (Exception ex)
             {
-                throw new Exception("Generic SQL Data Object Update Method: " + ex.Message + "\n" + ex.StackTrace);
+                throw new Exception("Generic SQL Data Object Update Method: " + ex.Message);
             }
 
             return xBool;
@@ -430,39 +582,48 @@ namespace GenericDataObject
 
         #region Delete
 
-        public static bool Delete(TBusinessObject itemToDelete)
+        public bool Delete(TModel itemToDelete)
         {
             int tmp = 0;
             return Delete(itemToDelete, out tmp);
         }
 
-        public static bool Delete(TBusinessObject itemToDelete, out int rowsAffected)
+        public bool Delete(TModel itemToDelete, out int rowsAffected)
         {
             return Delete(itemToDelete, System.Data.CommandType.Text, string.Empty, null, out rowsAffected);
         }
 
-        public static bool Delete(TBusinessObject itemToDelete, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters)
+        public bool Delete(TModel itemToDelete, System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters)
         {
             int tmp = 0;
             return Delete(itemToDelete, commandType, commandText, commandParameters, out tmp);
         }
 
-        public static bool Delete(TBusinessObject itemToDelete, System.Data.CommandType commandType, string commandText, SqlParameterCollection commandParameters, out int rowsAffected)
+        public bool Delete(TModel itemToDelete, System.Data.CommandType commandType, string commandText, List<SqlParameter> commandParameters, out int rowsAffected)
         {
             bool xBool = false;
             rowsAffected = 0;
 
             try
             {
-                hasID(itemToDelete);
+                //hasID(itemToDelete);
                 hasConnectionString();
                 hasSqlTable();
-                using (SqlConnection xCon = new SqlConnection(connectionString))
+                using (SqlConnection xCon = new SqlConnection(_connectionString))
                 {
                     using (SqlCommand xCom = new SqlCommand())
                     {
                         xCom.Connection = xCon;
-                        string query = string.Format("Delete From [{0}] Where [ID] = {1}", sqlTable, Convert.ToInt32(itemToDelete.GetType().GetProperty("ID").GetValue(itemToDelete, null)));
+                        string query = string.Format("Delete From {0}", _SQLTable);
+                        foreach (System.Reflection.PropertyInfo item in itemToDelete.GetType().GetProperties())
+                        {
+                            if (item.IsIdentity())
+                            {
+                                int identityValue = Convert.ToInt32(item.GetValue(itemToDelete, null) ?? -1);
+                                query = string.Format("Delete From {0} Where [{1}] = {2}", _SQLTable, item.GetFieldNameOrDefault(), identityValue);
+                                break;
+                            }
+                        }
                         xCom.CommandText = string.IsNullOrEmpty(commandText) ? query : commandText;
                         xCom.CommandType = commandType;
                         if (commandParameters != null)
@@ -480,7 +641,7 @@ namespace GenericDataObject
                         }
                         catch (SqlException ex)
                         {
-                            throw new Exception("Generic SQL Data Object Delete Method: " + ex.Message + "\n" + ex.StackTrace);
+                            throw new Exception("Generic SQL Data Object Delete Method: " + ex.Message);
                         }
                         finally
                         {
@@ -491,7 +652,7 @@ namespace GenericDataObject
             }
             catch (Exception ex)
             {
-                throw new Exception("Generic SQL Data Object Delete Method: " + ex.Message + "\n" + ex.StackTrace);
+                throw new Exception("Generic SQL Data Object Delete Method: " + ex.Message);
             }
 
             return xBool;
@@ -501,11 +662,11 @@ namespace GenericDataObject
 
         #region Private Methods
 
-        private static bool hasID(TBusinessObject item)
+        private static bool hasID(TModel item)
         {
             if (item.GetType().GetProperty("ID") == null)
             {
-                throw new Exception(string.Format("Operation Failed, The Object of Type ({0}) does not have a property named \"ID\" of Type Int32", typeof(TBusinessObject).Name));
+                throw new Exception(string.Format("Operation Failed, The Object of Type ({0}) does not have a property named \"ID\" of Type Int32", typeof(TModel).Name));
             }
             return true;
         }
@@ -521,6 +682,11 @@ namespace GenericDataObject
 
         private static bool hasSqlTable()
         {
+            SQLTableNameAttribute tableNameAttribute = (SQLTableNameAttribute)typeof(TModel).GetCustomAttributes(typeof(SQLTableNameAttribute), false).FirstOrDefault();
+            if (tableNameAttribute != null)
+            {
+                sqlTable = tableNameAttribute.useClassName ? typeof(TModel).Name : (tableNameAttribute.tableName ?? sqlTable);
+            }
             if (string.IsNullOrEmpty(sqlTable))
             {
                 throw new Exception("Operation Aborted, Data Object sqlTable has not yet been configured. Please make sure the sqlTable has been set Before calling any operation.");
@@ -540,7 +706,7 @@ namespace GenericDataObject
             }
         }
 
-        private static void CacheList(List<TBusinessObject> items)
+        private static void CacheList(List<TModel> items)
         {
             cachedItems = items;
             timeRefresh = DateTime.Now.AddMinutes(refreshInterval);
